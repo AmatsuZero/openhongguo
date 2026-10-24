@@ -1,0 +1,13 @@
+.tools/
+.worktrees/
+.superpowers/
+bin/
+*.apk
+*.pcap
+*-evidence.json
+phoenix-runtime-window.xml
+
+
+# device capture data: identifiers, pcaps, CA modules
+mitm-capture/
+tmpderive.go

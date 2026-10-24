@@ -1,0 +1,32 @@
+# Replays the CLI's calls against the live service every day and fails when a
+# response no longer matches the fixtures in testdata/protocol, or when the
+# derived content key stops decrypting a frame.
+name: live contract
+
+on:
+  schedule:
+    - cron: "17 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - run: go test ./...
+      - name: Live contract
+        env:
+          OHG_CONTRACT_OUT: ${{ runner.temp }}/contract
+        run: go test -count=1 -tags live -run TestLiveContract -v ./internal/contract
+      # Shapes are field paths and types only: no URLs, IDs, or key material.
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-shapes
+          path: ${{ runner.temp }}/contract
+          if-no-files-found: ignore
