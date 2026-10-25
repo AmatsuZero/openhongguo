@@ -1,4 +1,5 @@
-// Command tsgen 根据 sdk 和 sdk/model 的源码生成 npm 包的 TypeScript 类型。
+// Command tsgen 根据 sdk 和 sdk/model 的源码生成 TypeScript 类型，
+// 供 Node.js（types.d.ts）和 React Native（src/types.ts）两个包使用。
 //
 // 结构体按 JSON 标签生成接口：带 omitempty 的字段是可选的，标为 "-" 的字段
 // 不生成。没有 JSON 标签的查询参数结构体，字段名改为首字母小写的驼峰，

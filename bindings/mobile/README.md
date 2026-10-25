@@ -48,9 +48,11 @@ gomobile init
 然后在本目录下运行 `build.sh`。
 
 ```sh
-./build.sh android   # 生成 android/build/outputs/aar/openhongguo-release.aar
-./build.sh ios       # 生成 ios/OpenhongguoCore.xcframework
-./build.sh           # 两者都构建
+./build.sh android        # 生成 android/build/outputs/aar/openhongguo-release.aar
+./build.sh ios            # 生成 ios/OpenhongguoCore.xcframework
+./build.sh react-native   # 把 core 放进 ../react-native
+./build.sh flutter        # 把 core 放进 ../flutter
+./build.sh                # 以上全部
 ```
 
 Android 还需要以下环境：

@@ -6,19 +6,21 @@ import (
 	"testing"
 )
 
-// TestTypesUpToDate 保证提交的 types.d.ts 与 Go 源码一致。
-// 不一致时运行 go run ./bindings/node/tsgen > bindings/node/types.d.ts。
+// TestTypesUpToDate 保证 Node.js 和 React Native 包里提交的类型与 Go 源码一致。
+// 不一致时运行 go run ./bindings/node/tsgen > <文件>。
 func TestTypesUpToDate(t *testing.T) {
 	root := filepath.Join("..", "..", "..")
 	want, err := generate(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := os.ReadFile(filepath.Join("..", "types.d.ts"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != want {
-		t.Fatal("bindings/node/types.d.ts is stale: run go run ./bindings/node/tsgen > bindings/node/types.d.ts")
+	for _, path := range []string{"bindings/node/types.d.ts", "bindings/react-native/src/types.ts"} {
+		got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(got) != want {
+			t.Errorf("%s is stale: run go run ./bindings/node/tsgen > %s", path, path)
+		}
 	}
 }

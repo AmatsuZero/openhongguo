@@ -1,6 +1,6 @@
 # openhongguo
 
-openhongguo 是红果短剧（Hongguo）的非官方开源客户端，包含 Go SDK、命令行工具 `ohg`，以及 Node.js、Android 和 iOS 的 SDK。
+openhongguo 是红果短剧（Hongguo）的非官方开源客户端，包含 Go SDK、命令行工具 `ohg`，以及 Node.js、Android、iOS、React Native 和 Flutter 的 SDK。
 
 它能浏览短剧目录、搜索、播放和下载。所有请求都以匿名设备的身份发出，不需要登录。
 
@@ -112,9 +112,37 @@ let page = try await client.search("全球死考")
 
 两个库都还没有发布，构建和用法见 [bindings/mobile/README.md](bindings/mobile/README.md)。
 
+## React Native 与 Flutter SDK
+
+`bindings/react-native` 和 `bindings/flutter` 用的也是 gomobile 编译的 Go 库，原生层只是一层很薄的桥接。
+
+- React Native 版通过 Expo Modules 接入，接口和 Node.js 版相同。
+- Flutter 版通过平台通道调用，类型和 Kotlin、Swift 版一样由 Go 源码生成。
+
+```ts
+const client = await createClient();               // React Native
+const page = await client.search('全球死考');
+```
+
+```dart
+final client = await OpenhongguoClient.create();   // Flutter
+final page = await client.search('全球死考');
+```
+
+两个包都还没有发布，构建和用法见 [bindings/react-native/README.md](bindings/react-native/README.md) 和 [bindings/flutter/README.md](bindings/flutter/README.md)。
+
 ## 开发
 
-`go test ./...` 不访问网络。每日的接口契约检查，以及每次推送时运行的持续集成，见 [docs/development.md](docs/development.md)。
+根目录的 `Makefile` 是统一入口，`make help` 列出所有目标。常用的有以下几个。
+
+```sh
+make test          # Go、Node.js、React Native 和 Flutter 的测试，不访问网络
+make test-mobile   # Android 和 iOS 的测试，需要 gomobile、Android SDK 和 Xcode
+make gen           # 修改 sdk 的类型后，重新生成各语言的类型
+make build         # 构建 CLI、Node.js 包和全部移动端包
+```
+
+每日的接口契约检查，以及每次推送时运行的持续集成，见 [docs/development.md](docs/development.md)。
 
 ## 目录结构
 
@@ -126,7 +154,9 @@ let page = try await client.search("全球死考")
 - `internal/history/`：观看记录
 - `internal/contract/`：接口契约检查
 - `bindings/node/`：Node.js SDK（WebAssembly 封装）
-- `bindings/mobile/`：Android 与 iOS SDK（gomobile 封装）
+- `bindings/mobile/`：Android 与 iOS SDK（gomobile 封装），以及编译 Go core 的 `build.sh`
+- `bindings/react-native/`：React Native SDK（Expo 模块）
+- `bindings/flutter/`：Flutter SDK（平台通道插件）
 - `bindings/internal/`：各语言绑定共用的方法表、类型解析和测试样本服务
 - `docs/cli.md`、`docs/development.md`：命令行文档，以及契约检查与持续集成的说明
 - `docs/rea/`：协议与解密的逆向分析记录，见 [docs/rea/README.md](docs/rea/README.md)

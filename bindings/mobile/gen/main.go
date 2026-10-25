@@ -1,5 +1,5 @@
-// Command gen 根据 sdk 和 sdk/model 的源码，生成 Android 绑定的 Types.kt 和
-// iOS 绑定的 Types.swift。
+// Command gen 根据 sdk 和 sdk/model 的源码，生成 Android 绑定的 Types.kt、
+// iOS 绑定的 Types.swift 和 Flutter 包的 types.dart。
 //
 // 属性名由 JSON 名转成驼峰（series_id → seriesId），两个平台一致。Go 里的
 // 零值缺省规则照搬过来：除了 Go 的指针字段可以为空，其余字段缺省时取零值，
@@ -23,6 +23,7 @@ import (
 const (
 	kotlinFile = "bindings/mobile/android/src/main/kotlin/dev/openhongguo/Types.kt"
 	swiftFile  = "bindings/mobile/ios/Sources/Openhongguo/Types.swift"
+	dartFile   = "bindings/flutter/lib/src/types.dart"
 )
 
 func main() {
@@ -48,6 +49,7 @@ func generate(root string) (map[string]string, error) {
 	return map[string]string{
 		filepath.FromSlash(kotlinFile): kotlin(s),
 		filepath.FromSlash(swiftFile):  swift(s),
+		filepath.FromSlash(dartFile):   dart(s),
 	}, nil
 }
 

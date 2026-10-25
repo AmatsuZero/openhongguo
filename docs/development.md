@@ -42,5 +42,7 @@ go test -tags live -run TestLiveContract -v ./internal/contract
 - Node.js：在 Node 20 和 22 上构建 wasm 并运行测试。
 - Android：编译 aar，运行 Kotlin 单元测试，再在模拟器上运行设备测试。
 - iOS：编译 xcframework，在 macOS 上运行 Swift 测试，并为 iOS 真机和模拟器编译。
+- React Native：编译 TypeScript，用假的原生模块测试客户端。
+- Flutter：用模拟的平台通道测试客户端。
 
 只改动文档时不运行。
