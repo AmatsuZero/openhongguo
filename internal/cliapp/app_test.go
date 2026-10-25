@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	filestore "github.com/beilunyang/openhongguo/adapters/file"
-	httpadapter "github.com/beilunyang/openhongguo/adapters/http"
+	"github.com/beilunyang/openhongguo/adapters/filestore"
+	"github.com/beilunyang/openhongguo/adapters/httptransport"
 	"github.com/beilunyang/openhongguo/internal/history"
 	mediapkg "github.com/beilunyang/openhongguo/internal/media"
 	"github.com/beilunyang/openhongguo/internal/protocol"
@@ -55,11 +55,8 @@ func TestCLIAnonymousReadsUseShippedClient(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	dir := t.TempDir()
-	store := filestore.NewProfileStore(filepath.Join(dir, "anonymous.json"))
-	transport, err := httpadapter.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	store := filestore.New(filepath.Join(dir, "anonymous.json"))
+	transport := httptransport.New()
 	client, err := sdk.NewClient(sdk.Options{
 		Transport: transport, ProfileStore: store,
 		APIOrigin: srv.URL, RegisterOrigin: srv.URL,
@@ -323,7 +320,7 @@ func TestCLIPassesChannelAndSearchTab(t *testing.T) {
 
 func TestDeviceShowOmitsGuestTicket(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "anonymous.json")
-	store := filestore.NewProfileStore(path)
+	store := filestore.New(path)
 	profile, err := sdk.NewAnonymousDeviceProfile(strings.NewReader(strings.Repeat("a", 72)), func() time.Time { return time.Unix(1, 0).UTC() })
 	if err != nil {
 		t.Fatal(err)
@@ -382,11 +379,8 @@ func TestCLIRejectsLoginAndMapsAccountError(t *testing.T) {
 		_, _ = w.Write(account)
 	}))
 	t.Cleanup(srv.Close)
-	store := filestore.NewProfileStore(filepath.Join(t.TempDir(), "anonymous.json"))
-	transport, err := httpadapter.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	store := filestore.New(filepath.Join(t.TempDir(), "anonymous.json"))
+	transport := httptransport.New()
 	client, err := sdk.NewClient(sdk.Options{Transport: transport, ProfileStore: store, APIOrigin: srv.URL, RegisterOrigin: srv.URL})
 	if err != nil {
 		t.Fatal(err)

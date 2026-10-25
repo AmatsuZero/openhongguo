@@ -1,5 +1,8 @@
-// Package httpadapter is the default net/http transport for anonymous reads.
-package httpadapter
+// Package httptransport 是 SDK 默认的网络请求实现（sdk.Transport），基于 net/http。
+//
+// 它只发送匿名请求：带 Authorization 或账号 Cookie 的请求一律拒绝，
+// 也不保存 Cookie。
+package httptransport
 
 import (
 	"bytes"
@@ -15,21 +18,24 @@ import (
 	"github.com/beilunyang/openhongguo/sdk"
 )
 
-// Transport performs anonymous HTTP requests. It does not keep a cookie jar.
+// Transport 发送匿名 HTTP 请求，可以并发使用。
 type Transport struct {
 	client *http.Client
 	logger sdk.Logger
 }
 
-func New() (*Transport, error) {
-	return &Transport{client: &http.Client{Timeout: 30 * time.Second}}, nil
+// New 返回单个请求超时 30 秒的 Transport。
+func New() *Transport {
+	return &Transport{client: &http.Client{Timeout: 30 * time.Second}}
 }
 
+// SetLogger 让每个请求的方法、脱敏后的 URL 和状态码写进 logger。
 func (t *Transport) SetLogger(logger sdk.Logger) { t.logger = logger }
 
+// Do 发送 req。响应体最多读取 8 MB，保持原样，不自动解压。
 func (t *Transport) Do(ctx context.Context, req *sdk.Request) (*sdk.Response, error) {
 	if req == nil {
-		return nil, errors.New("http adapter: nil request")
+		return nil, errors.New("httptransport: nil request")
 	}
 	for name, value := range req.Headers {
 		if strings.EqualFold(name, "Authorization") || (strings.EqualFold(name, "Cookie") && !guestCookieAllowed(value)) {
@@ -77,8 +83,8 @@ func (t *Transport) Do(ctx context.Context, req *sdk.Request) (*sdk.Response, er
 	return &sdk.Response{StatusCode: resp.StatusCode, Headers: headers, Body: body, Cookies: cookies}, nil
 }
 
-// guestCookieAllowed accepts only the anonymous cookie built from this installation.
-// Account cookies, including a session cookie, stay refused.
+// guestCookieAllowed 只放行 SDK 为匿名设备构造的 Cookie；
+// 账号 Cookie（包括 session）一律拒绝。
 func guestCookieAllowed(value string) bool {
 	lower := strings.ToLower(value)
 	if strings.Contains(lower, "session") || strings.Contains(lower, "odin_tt") {

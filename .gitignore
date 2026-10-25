@@ -11,3 +11,7 @@ phoenix-runtime-window.xml
 # device capture data: identifiers, pcaps, CA modules
 mitm-capture/
 tmpderive.go
+
+# reverse-engineering evidence (decompiled classes, frames): kept locally only
+docs/rea/*.json
+docs/rea/*.jpg

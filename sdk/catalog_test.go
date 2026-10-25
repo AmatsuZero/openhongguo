@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	httpadapter "github.com/beilunyang/openhongguo/adapters/http"
-	"github.com/beilunyang/openhongguo/adapters/memory"
+	"github.com/beilunyang/openhongguo/adapters/httptransport"
+	"github.com/beilunyang/openhongguo/adapters/memstore"
 	"github.com/beilunyang/openhongguo/internal/protocol"
 	"github.com/beilunyang/openhongguo/sdk"
 	"github.com/beilunyang/openhongguo/sdk/model"
@@ -49,15 +49,12 @@ func testClient(t *testing.T, handler http.Handler) (*sdk.Client, *logCapture) {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
-	transport, err := httpadapter.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	transport := httptransport.New()
 	logs := &logCapture{}
 	transport.SetLogger(logs)
 	client, err := sdk.NewClient(sdk.Options{
 		Transport:          transport,
-		ProfileStore:       memory.New(),
+		ProfileStore:       memstore.New(),
 		APIOrigin:          srv.URL,
 		RegisterOrigin:     srv.URL,
 		DistributionOrigin: srv.URL,
@@ -656,12 +653,9 @@ func TestRetriesRateLimitedRequest(t *testing.T) {
 		_, _ = w.Write(fixture(t, "discover-response.json"))
 	}))
 	t.Cleanup(srv.Close)
-	transport, err := httpadapter.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	transport := httptransport.New()
 	client, err := sdk.NewClient(sdk.Options{
-		Transport: transport, ProfileStore: memory.New(),
+		Transport: transport, ProfileStore: memstore.New(),
 		APIOrigin: srv.URL, RegisterOrigin: srv.URL, RetryAttempts: 3,
 		Clock: func() time.Time { return time.UnixMilli(1_700_000_000_123).UTC() },
 	})
@@ -684,12 +678,9 @@ func TestDoesNotRetryBadRequest(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 	}))
 	t.Cleanup(srv.Close)
-	transport, err := httpadapter.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	transport := httptransport.New()
 	client, err := sdk.NewClient(sdk.Options{
-		Transport: transport, ProfileStore: memory.New(),
+		Transport: transport, ProfileStore: memstore.New(),
 		APIOrigin: srv.URL, RegisterOrigin: srv.URL, RetryAttempts: 3,
 	})
 	if err != nil {
@@ -772,12 +763,9 @@ func TestLongBanWindowFailsFastInsteadOfSleeping(t *testing.T) {
 		_, _ = w.Write([]byte(`{"code":100,"message":"{\"minBanTime\":600,\"maxBanTime\":900,\"banRate\":1}"}`))
 	}))
 	t.Cleanup(srv.Close)
-	transport, err := httpadapter.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	transport := httptransport.New()
 	client, err := sdk.NewClient(sdk.Options{
-		Transport: transport, ProfileStore: memory.New(),
+		Transport: transport, ProfileStore: memstore.New(),
 		APIOrigin: srv.URL, RegisterOrigin: srv.URL, RetryAttempts: 3,
 	})
 	if err != nil {
@@ -843,12 +831,9 @@ func TestShortFilterUsesDistributionOriginAndPages(t *testing.T) {
 		http.NotFound(w, r)
 	}))
 	t.Cleanup(api.Close)
-	transport, err := httpadapter.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	transport := httptransport.New()
 	client, err := sdk.NewClient(sdk.Options{
-		Transport: transport, ProfileStore: memory.New(),
+		Transport: transport, ProfileStore: memstore.New(),
 		APIOrigin: api.URL, RegisterOrigin: api.URL, DistributionOrigin: dist.URL,
 	})
 	if err != nil {
@@ -1324,10 +1309,7 @@ func TestDeviceIsRegisteredStoredAndPresented(t *testing.T) {
 		}
 	}))
 	t.Cleanup(srv.Close)
-	transport, err := httpadapter.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	transport := httptransport.New()
 	newClient := func(store sdk.ProfileStore, d model.Device) *sdk.Client {
 		t.Helper()
 		c, err := sdk.NewClient(sdk.Options{Transport: transport, ProfileStore: store, APIOrigin: srv.URL, RegisterOrigin: srv.URL, Device: d})
@@ -1337,7 +1319,7 @@ func TestDeviceIsRegisteredStoredAndPresented(t *testing.T) {
 		return c
 	}
 	pad := model.Device{Model: "21051182C", OSVersion: "11", OSAPI: 30, Build: "RKQ1.200826.002", Pad: true}
-	store := memory.New()
+	store := memstore.New()
 	if _, err := newClient(store, pad).SearchCues(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -1377,7 +1359,7 @@ func TestDeviceIsRegisteredStoredAndPresented(t *testing.T) {
 		reqs[len(reqs)-1].query.Get("device_type") != model.DefaultDevice.Model {
 		t.Fatalf("pinned device = %+v query %v", again.Device, reqs[len(reqs)-1].query)
 	}
-	if _, err := sdk.NewClient(sdk.Options{Transport: transport, ProfileStore: memory.New(), Device: model.Device{Model: "x; evil"}}); !errors.Is(err, sdk.ErrInvalidOptions) {
+	if _, err := sdk.NewClient(sdk.Options{Transport: transport, ProfileStore: memstore.New(), Device: model.Device{Model: "x; evil"}}); !errors.Is(err, sdk.ErrInvalidOptions) {
 		t.Fatalf("bad device err = %v", err)
 	}
 }

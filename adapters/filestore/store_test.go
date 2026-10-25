@@ -1,4 +1,4 @@
-package file
+package filestore
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 
 func TestProfileFileModeIsOwnerReadWrite(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "anonymous.json")
-	store := NewProfileStore(path)
+	store := New(path)
 	profile, err := sdk.NewAnonymousDeviceProfile(nil, func() time.Time { return time.Unix(1, 0).UTC() })
 	if err != nil {
 		t.Fatal(err)

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/beilunyang/openhongguo/adapters/memory"
+	"github.com/beilunyang/openhongguo/adapters/memstore"
 	"github.com/beilunyang/openhongguo/internal/protocol"
 	"github.com/beilunyang/openhongguo/sdk"
 )
@@ -127,7 +127,7 @@ func runFixtures(t *testing.T, override map[string][]byte) []Check {
 	t.Helper()
 	return Run(context.Background(), Config{
 		Transport:  &fixtureTransport{t: t, override: override},
-		Profiles:   memory.New(),
+		Profiles:   memstore.New(),
 		FixtureDir: fixtureDir,
 		Query:      "Fixture",
 	})

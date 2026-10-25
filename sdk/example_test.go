@@ -6,23 +6,16 @@ import (
 	"fmt"
 	"log"
 
-	filestore "github.com/beilunyang/openhongguo/adapters/file"
-	httpadapter "github.com/beilunyang/openhongguo/adapters/http"
+	"github.com/beilunyang/openhongguo/adapters"
+	"github.com/beilunyang/openhongguo/adapters/filestore"
+	"github.com/beilunyang/openhongguo/adapters/httptransport"
 	"github.com/beilunyang/openhongguo/sdk"
 )
 
-// newClient 是各示例共用的客户端：使用 HTTPS transport，
+// newClient 是各示例共用的客户端：使用默认的 HTTPS transport，
 // 匿名设备保存在 anonymous.json 中。
 func newClient() *sdk.Client {
-	transport, err := httpadapter.New()
-	if err != nil {
-		log.Fatal(err)
-	}
-	client, err := sdk.NewClient(sdk.Options{
-		Transport:     transport,
-		ProfileStore:  filestore.NewProfileStore("anonymous.json"),
-		RetryAttempts: 3,
-	})
+	client, err := adapters.NewClient("anonymous.json", sdk.Options{RetryAttempts: 3})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -30,13 +23,9 @@ func newClient() *sdk.Client {
 }
 
 func ExampleNewClient() {
-	transport, err := httpadapter.New()
-	if err != nil {
-		log.Fatal(err)
-	}
 	client, err := sdk.NewClient(sdk.Options{
-		Transport:    transport,
-		ProfileStore: filestore.NewProfileStore("anonymous.json"),
+		Transport:    httptransport.New(),
+		ProfileStore: filestore.New("anonymous.json"),
 	})
 	if err != nil {
 		log.Fatal(err)

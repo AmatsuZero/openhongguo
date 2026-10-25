@@ -9,8 +9,10 @@ import (
 	"testing"
 )
 
+// testdata/anonymous-surfaces.json 是从 APK 整理出的匿名接口索引（路径和请求字段），
+// 摘自本机的 docs/rea/anonymous-surfaces.json，去掉了证据引用。
 func TestShippedPathsAreInAnonymousSurfaceEvidence(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "docs", "rea", "anonymous-surfaces.json"))
+	raw, err := os.ReadFile(filepath.Join("testdata", "anonymous-surfaces.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

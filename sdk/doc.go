@@ -6,14 +6,16 @@
 // # 快速上手
 //
 // NewClient 需要一个 Transport 和一个 ProfileStore。Transport 负责发送请求，
-// ProfileStore 负责保存匿名设备。adapters/http 和 adapters/file
-// 两个包提供了现成的实现：
+// ProfileStore 负责保存匿名设备。最简单的办法是用 adapters.NewClient，
+// 它用现成的实现补齐这两项，把设备档案存在指定的文件里：
 //
-//	transport, err := httpadapter.New()
-//	if err != nil { ... }
+//	client, err := adapters.NewClient("anonymous.json", sdk.Options{})
+//
+// 也可以自己组合 adapters 的子包，或者换成自己的实现：
+//
 //	client, err := sdk.NewClient(sdk.Options{
-//		Transport:    transport,
-//		ProfileStore: filestore.NewProfileStore("anonymous.json"),
+//		Transport:    httptransport.New(),
+//		ProfileStore: memstore.New(),
 //	})
 //
 // # 客户端能读取什么

@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"syscall"
 
-	filestore "github.com/beilunyang/openhongguo/adapters/file"
-	httpadapter "github.com/beilunyang/openhongguo/adapters/http"
+	"github.com/beilunyang/openhongguo/adapters"
+	"github.com/beilunyang/openhongguo/adapters/filestore"
 	"github.com/beilunyang/openhongguo/internal/cliapp"
 	"github.com/beilunyang/openhongguo/internal/history"
 	"github.com/beilunyang/openhongguo/internal/media"
@@ -35,16 +35,9 @@ func run() int {
 		fmt.Fprintln(os.Stderr, err)
 		return cliapp.ExitFailure
 	}
-	store := filestore.NewProfileStore(filepath.Join(dir, "anonymous.json"))
-	transport, err := httpadapter.New()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return cliapp.ExitFailure
-	}
-	client, err := sdk.NewClient(sdk.Options{
-		Transport:          transport,
+	store := filestore.New(filepath.Join(dir, "anonymous.json"))
+	client, err := adapters.NewClient("", sdk.Options{
 		ProfileStore:       store,
-		Signer:             sdk.UnavailableSigner{},
 		APIOrigin:          os.Getenv("OHG_API_ORIGIN"),
 		RegisterOrigin:     os.Getenv("OHG_REGISTER_ORIGIN"),
 		DistributionOrigin: os.Getenv("OHG_DISTRIBUTION_ORIGIN"),

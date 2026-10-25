@@ -1,4 +1,5 @@
-package file
+// Package filestore 把匿名设备档案保存成一个 JSON 文件（sdk.ProfileStore）。
+package filestore
 
 import (
 	"context"
@@ -12,15 +13,18 @@ import (
 	"github.com/beilunyang/openhongguo/sdk"
 )
 
-// ProfileStore saves the anonymous profile with mode 0600.
-type ProfileStore struct {
+// Store 把设备档案存在一个文件里，权限 0600，可以并发使用。
+// 写入先写临时文件再改名，中途失败不会留下半个文件；路径是符号链接时拒绝读写。
+type Store struct {
 	path string
 	mu   sync.Mutex
 }
 
-func NewProfileStore(path string) *ProfileStore { return &ProfileStore{path: path} }
+// New 返回保存在 path 的 Store。目录在首次保存时创建，权限 0700。
+func New(path string) *Store { return &Store{path: path} }
 
-func (s *ProfileStore) Load(ctx context.Context) (*sdk.DeviceProfile, error) {
+// Load 读取档案；文件不存在时返回 sdk.ErrProfileNotFound。
+func (s *Store) Load(ctx context.Context) (*sdk.DeviceProfile, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -43,7 +47,8 @@ func (s *ProfileStore) Load(ctx context.Context) (*sdk.DeviceProfile, error) {
 	return &p, nil
 }
 
-func (s *ProfileStore) Save(ctx context.Context, p *sdk.DeviceProfile) error {
+// Save 保存档案。
+func (s *Store) Save(ctx context.Context, p *sdk.DeviceProfile) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -82,7 +87,8 @@ func (s *ProfileStore) Save(ctx context.Context, p *sdk.DeviceProfile) error {
 	return os.Chmod(s.path, 0600)
 }
 
-func (s *ProfileStore) Reset(ctx context.Context) error {
+// Reset 删除档案文件；文件不存在时不报错。
+func (s *Store) Reset(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}

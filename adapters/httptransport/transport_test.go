@@ -1,4 +1,4 @@
-package httpadapter
+package httptransport
 
 import (
 	"context"
@@ -10,11 +10,8 @@ import (
 )
 
 func TestTransportRefusesCredentialHeaders(t *testing.T) {
-	tr, err := New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = tr.Do(context.Background(), &sdk.Request{
+	tr := New()
+	_, err := tr.Do(context.Background(), &sdk.Request{
 		Method: http.MethodGet, URL: "http://127.0.0.1/unused",
 		Headers: map[string]string{"Cookie": "session=nope"},
 	})
@@ -24,11 +21,8 @@ func TestTransportRefusesCredentialHeaders(t *testing.T) {
 }
 
 func TestTransportAllowsAnonymousGuestCookie(t *testing.T) {
-	tr, err := New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = tr.Do(context.Background(), &sdk.Request{
+	tr := New()
+	_, err := tr.Do(context.Background(), &sdk.Request{
 		Method: http.MethodGet, URL: "http://127.0.0.1:1/unused",
 		Headers: map[string]string{"Cookie": "passport_csrf_token=; passport_csrf_token_default=; store-region=cn; store-region-src=did; install_id=1; ttreq=abc"},
 	})

@@ -1,4 +1,6 @@
-package memory
+// Package memstore 只在内存里保存匿名设备档案（sdk.ProfileStore），进程退出后丢失。
+// 适合测试，以及不想在磁盘上留下设备的场景。
+package memstore
 
 import (
 	"context"
@@ -7,14 +9,16 @@ import (
 	"github.com/beilunyang/openhongguo/sdk"
 )
 
-// Store keeps one anonymous profile in memory.
+// Store 在内存里保存一份档案，可以并发使用。
 type Store struct {
 	mu      sync.Mutex
 	profile *sdk.DeviceProfile
 }
 
+// New 返回一个空的 Store。
 func New() *Store { return &Store{} }
 
+// Load 返回档案的副本；没有档案时返回 sdk.ErrProfileNotFound。
 func (s *Store) Load(ctx context.Context) (*sdk.DeviceProfile, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -28,6 +32,7 @@ func (s *Store) Load(ctx context.Context) (*sdk.DeviceProfile, error) {
 	return &cp, nil
 }
 
+// Save 保存档案的副本。
 func (s *Store) Save(ctx context.Context, profile *sdk.DeviceProfile) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -42,6 +47,7 @@ func (s *Store) Save(ctx context.Context, profile *sdk.DeviceProfile) error {
 	return nil
 }
 
+// Reset 丢弃档案。
 func (s *Store) Reset(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err

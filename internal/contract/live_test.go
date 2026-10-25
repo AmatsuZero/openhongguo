@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	filestore "github.com/beilunyang/openhongguo/adapters/file"
-	httpadapter "github.com/beilunyang/openhongguo/adapters/http"
+	"github.com/beilunyang/openhongguo/adapters/filestore"
+	"github.com/beilunyang/openhongguo/adapters/httptransport"
 )
 
 // TestLiveContract replays the CLI's calls against the live service:
@@ -31,10 +31,7 @@ func TestLiveContract(t *testing.T) {
 	if dir == "" {
 		dir = t.TempDir()
 	}
-	transport, err := httpadapter.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	transport := httptransport.New()
 	query := os.Getenv("OHG_CONTRACT_QUERY")
 	if query == "" {
 		query = "全球死考"
@@ -47,7 +44,7 @@ func TestLiveContract(t *testing.T) {
 	defer cancel()
 	checks := Run(ctx, Config{
 		Transport:     transport,
-		Profiles:      filestore.NewProfileStore(filepath.Join(dir, "anonymous.json")),
+		Profiles:      filestore.New(filepath.Join(dir, "anonymous.json")),
 		FixtureDir:    filepath.Join("..", "..", "testdata", "protocol"),
 		Query:         query,
 		MovieSeriesID: os.Getenv("OHG_CONTRACT_MOVIE"),

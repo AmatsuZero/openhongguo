@@ -4,8 +4,9 @@ import (
 	"time"
 
 	"errors"
-	"github.com/beilunyang/openhongguo/internal/protocol"
 	"testing"
+
+	"github.com/beilunyang/openhongguo/internal/protocol"
 )
 
 func TestAccountAndDRMErrorsStayDistinct(t *testing.T) {

@@ -67,7 +67,7 @@ func (p PayType) String() string {
 // 官方 App 的枚举混用小数值和从 1000 起的一段数值；这里两者都复现。
 type ContentType int
 
-// 内容类型。下面每个值都在线上响应中见过（docs/rea/video-model-enums.json）。
+// 内容类型。下面每个值都在线上响应中见过，并与 App 代码里的枚举核对过。
 const (
 	ContentUnknown         ContentType = 0
 	ContentShortSeries     ContentType = 1    // 真人短剧
@@ -120,8 +120,7 @@ func (c ContentType) String() string {
 // 取自 com.dragon.read.rpc.model.VideoPlatformType。
 type PlatformType int
 
-// 作品的来源平台。下面每个值都在线上响应中见过
-// （docs/rea/video-model-enums.json）。
+// 作品的来源平台。下面每个值都在线上响应中见过，并与 App 代码里的枚举核对过。
 const (
 	PlatformUnknown   PlatformType = 0    // 未知；有声书带此值
 	PlatformDouyin    PlatformType = 1    // 抖音
