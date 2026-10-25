@@ -10,36 +10,42 @@ import (
 	"github.com/beilunyang/openhongguo/sdk/model"
 )
 
-// DeviceProfile is a locally generated anonymous installation.
-// Server-assigned ids stay empty until registration returns them.
-// DeviceToken is never printed by the CLI.
+// DeviceProfile 是本地生成的匿名安装。服务端分配的 id 在注册返回之前保持为空。
+// CLI 从不打印 DeviceToken。
 type DeviceProfile struct {
-	CDID           string    `json:"cdid"`
-	OpenUDID       string    `json:"openudid"`
-	ClientUDID     string    `json:"clientudid"`
-	OAID           string    `json:"oaid_id"`
-	ReqID          string    `json:"req_id"`
-	DeviceID       string    `json:"device_id_str,omitempty"`
-	InstallID      string    `json:"install_id_str,omitempty"`
-	DeviceToken    string    `json:"device_token,omitempty"`
-	TTReq          string    `json:"ttreq,omitempty"`
-	StoreRegion    string    `json:"store_region,omitempty"`
-	StoreRegionSrc string    `json:"store_region_src,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-	// Device is the phone the profile registered as; every request presents
-	// it. A profile without one takes the client's on first use.
+	// CDID、OpenUDID、ClientUDID、OAID 和 ReqID 是随机安装标识符，
+	// 由 App 在本地生成，注册时发送。
+	CDID       string `json:"cdid"`
+	OpenUDID   string `json:"openudid"`
+	ClientUDID string `json:"clientudid"`
+	OAID       string `json:"oaid_id"`
+	ReqID      string `json:"req_id"`
+	// DeviceID 和 InstallID 由注册分配，每次请求都会发送；
+	// DeviceToken 随它们一起下发。
+	DeviceID    string `json:"device_id_str,omitempty"`
+	InstallID   string `json:"install_id_str,omitempty"`
+	DeviceToken string `json:"device_token,omitempty"`
+	// TTReq、StoreRegion 和 StoreRegionSrc 是服务端设置的 cookie，
+	// 后续请求会原样带上。
+	TTReq          string `json:"ttreq,omitempty"`
+	StoreRegion    string `json:"store_region,omitempty"`
+	StoreRegionSrc string `json:"store_region_src,omitempty"`
+	// CreatedAt 是档案的生成时间（UTC）。
+	CreatedAt time.Time `json:"created_at"`
+	// Device 是档案注册时使用的手机，每次请求都出示它。
+	// 没有该字段的档案在首次使用时采用客户端的设备。
 	Device *model.Device `json:"device,omitempty"`
 }
 
-// ProfileStore persists one anonymous profile.
+// ProfileStore 持久化保存一个匿名档案。
 type ProfileStore interface {
 	Load(ctx context.Context) (*DeviceProfile, error)
 	Save(ctx context.Context, profile *DeviceProfile) error
 	Reset(ctx context.Context) error
 }
 
-// NewAnonymousDeviceProfile fills identity fields from crypto-secure randomness.
-// A nil entropy source uses crypto/rand. A nil clock uses time.Now.
+// NewAnonymousDeviceProfile 用密码学安全的随机数填充身份字段。
+// entropy 为 nil 时使用 crypto/rand；clock 为 nil 时使用 time.Now。
 func NewAnonymousDeviceProfile(entropy io.Reader, clock func() time.Time) (*DeviceProfile, error) {
 	if entropy == nil {
 		entropy = rand.Reader

@@ -2,22 +2,24 @@ package sdk
 
 import "context"
 
-// SignInput is the canonical request a Signer would cover.
+// SignInput 是 Signer 要签名的规范化请求。
 type SignInput struct {
+	// CanonicalRequest 是请求的字节，采用签名所覆盖的形式。
 	CanonicalRequest []byte
 }
 
-// SignedHeaders are header names and values returned by a Signer.
+// SignedHeaders 是 Signer 返回的请求头名称和值。
 type SignedHeaders map[string]string
 
-// Signer produces request signatures. Phase 1 does not call a native signer.
+// Signer 生成请求签名。第一阶段不调用原生签名器。
 type Signer interface {
 	Sign(ctx context.Context, input SignInput) (SignedHeaders, error)
 }
 
-// UnavailableSigner reports that the requested signature is not portable pure Go.
+// UnavailableSigner 表示所请求的签名无法用可移植的纯 Go 实现。
 type UnavailableSigner struct{}
 
+// Sign 总是以 ErrSignerUnavailable 失败。
 func (UnavailableSigner) Sign(context.Context, SignInput) (SignedHeaders, error) {
 	return nil, ErrSignerUnavailable
 }

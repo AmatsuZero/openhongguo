@@ -10,17 +10,17 @@ import (
 	"github.com/beilunyang/openhongguo/sdk/model"
 )
 
-// PlaybackOptions is reserved for representation or surface selection.
-// Phase 2 resolves the service model as shipped; the caller picks a stream.
+// PlaybackOptions 预留给码流规格或接口的选择。
+// 第二阶段按服务端下发的原样解析模型，由调用方挑选流。
 type PlaybackOptions struct{}
 
-// ResolvePlayback loads the anonymous media model for one episode.
+// ResolvePlayback 加载一集的匿名媒体模型。
 //
-// The request is the signed video_model call the shipped client sends. The
-// response is the client's TTVideoEngine model. A protected model comes back
-// together with ErrDRMProtected; pass it to ContentKey for the key. The
-// model carries the wrapped key material (Playback.KeyMaterial), never the
-// content key itself, per-segment check data, or decrypted media.
+// 请求就是官方客户端发出的、带签名的 video_model 调用。
+// 响应是客户端的 TTVideoEngine 模型。受保护的模型会和 ErrDRMProtected
+// 一起返回；把它传给 ContentKey 取得密钥。
+// 模型携带的是包装后的密钥材料（Playback.KeyMaterial），从不包含内容密钥本身、
+// 分片校验数据或解密后的媒体。
 func (c *Client) ResolvePlayback(ctx context.Context, episodeID string, _ PlaybackOptions) (*model.Playback, error) {
 	if !validID(episodeID) {
 		return nil, fmt.Errorf("invalid episode ID")
@@ -49,15 +49,14 @@ func (c *Client) ResolvePlayback(ctx context.Context, episodeID string, _ Playba
 	return playback, nil
 }
 
-// ContentKey recovers the content key of a protected playback model, the one
-// ResolvePlayback returns alongside ErrDRMProtected. It is local computation:
-// the key is unwrapped from the model's KeyMaterial the way the shipped
-// player does, with no further request. Every stream of the model shares it
-// (each quality of an episode carries the same spade_a and kid, observed
-// 2026-10-24).
+// ContentKey 恢复受保护播放模型的内容密钥，即 ResolvePlayback 连同
+// ErrDRMProtected 一起返回的模型。这是纯本地计算：
+// 按官方播放器的方式从模型的 KeyMaterial 解包出密钥，不再发出任何请求。
+// 模型的所有流共用这个密钥（同一集的每种清晰度都带有相同的 spade_a 和 kid，
+// 2026-10-24 观察）。
 //
-// A model that is not encrypted gives ErrNotProtected; key material this
-// version cannot unwrap gives ErrDRMProtected.
+// 未加密的模型返回 ErrNotProtected；当前版本无法解包的密钥材料返回
+// ErrDRMProtected。
 func ContentKey(pb *model.Playback) (model.ContentKey, error) {
 	if pb == nil {
 		return model.ContentKey{}, fmt.Errorf("playback model is missing")

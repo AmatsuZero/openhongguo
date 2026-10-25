@@ -23,12 +23,12 @@ import (
 const (
 	defaultAPIOrigin      = "https://" + protocol.APIHost
 	defaultRegisterOrigin = "https://" + protocol.RegisterHost
-	// defaultDistributionOrigin serves /reading/distribution/ and activity_api.
+	// defaultDistributionOrigin 承载 /reading/distribution/ 和 activity_api。
 	defaultDistributionOrigin = "https://" + protocol.DistributionHost
 )
 
-// Client performs anonymous catalog reads. It is safe for concurrent use
-// when the injected transport and profile store are.
+// Client 执行匿名片库读取。只要注入的 transport 和 profile store 可以并发使用，
+// Client 也可以并发使用。
 type Client struct {
 	guestMu        sync.Mutex
 	transport      Transport
@@ -40,12 +40,16 @@ type Client struct {
 	apiOrigin      string
 	registerOrigin string
 	distOrigin     string
-	// device is what a new profile registers as (Options.Device).
+	// device 是新档案注册时使用的设备（Options.Device）。
 	device model.Device
-	// retryAttempts is how many times one request may run (1 = no retry).
+	// retryAttempts 是单个请求最多执行的次数（1 表示不重试）。
 	retryAttempts int
 }
 
+// NewClient 根据 opts 创建客户端。Transport 和 ProfileStore 必填；
+// 其他依赖和 origin 取默认值（见 Options）。
+// 缺少必填依赖或 Options.Device 不可用时，返回 ErrInvalidOptions。
+// 创建时不发送请求：匿名设备在首次读取时注册。
 func NewClient(opts Options) (*Client, error) {
 	if opts.Transport == nil || opts.ProfileStore == nil {
 		return nil, ErrInvalidOptions
@@ -99,7 +103,7 @@ func (c *Client) do(ctx context.Context, method, origin, path string, query url.
 	return c.doRaw(ctx, method, u.String(), headers, body)
 }
 
-// doRaw sends a URL whose query is already signed. It does not re-encode that query.
+// doRaw 发送查询参数已签名的 URL，不会重新编码该查询参数。
 func (c *Client) doRaw(ctx context.Context, method, rawURL string, headers map[string]string, body []byte) ([]byte, map[string]string, error) {
 	for attempt := 0; ; attempt++ {
 		raw, cookies, err := c.doOnce(ctx, method, rawURL, headers, body, attempt)
@@ -108,8 +112,8 @@ func (c *Client) doRaw(ctx context.Context, method, rawURL string, headers map[s
 		}
 		wait := retryWait(err, attempt)
 		if wait > maxRetryWait {
-			// A ban window this long is the service asking the caller to
-			// back off, not a blip worth sleeping through.
+			// 封禁窗口这么长，说明服务端要求调用方退避，
+			// 而不是值得睡眠等过去的短暂抖动。
 			return nil, nil, fmt.Errorf("%w; the service asks to wait about %s before retrying", err, wait.Round(time.Second))
 		}
 		if waitErr := sleepContext(ctx, wait); waitErr != nil {
@@ -118,28 +122,27 @@ func (c *Client) doRaw(ctx context.Context, method, rawURL string, headers map[s
 	}
 }
 
-// maxRetryWait caps one in-place retry. The retry resends the same signed
-// request, so the cap also keeps its signing time fresh.
+// maxRetryWait 限定单次原地重试的等待时长。重试会重发同一个已签名请求，
+// 所以这个上限也让签名时间保持新鲜。
 const maxRetryWait = 10 * time.Second
 
-// retryableInLoop marks the failures worth repeating unchanged.
+// retryableInLoop 标出值得原样重发的失败。
 func retryableInLoop(err error) bool { return Retryable(err) }
 
-// retryWait is the backoff of this attempt, or the service's own ban window
-// when the failure carried one.
+// retryWait 返回本次尝试的退避时长；失败带有服务端封禁窗口时，返回该窗口。
 func retryWait(err error, attempt int) time.Duration {
 	backoff := time.Duration(300*(1<<uint(attempt))) * time.Millisecond
 	if backoff > 5*time.Second {
 		backoff = 5 * time.Second
 	}
-	// Spread concurrent callers over the window (0.8x .. 1.2x).
+	// 把并发调用方分散到窗口内（0.8x .. 1.2x）。
 	if crand, e := randInt64(); e == nil {
 		backoff = time.Duration(float64(backoff) * (0.8 + 0.4*float64(crand%100)/100))
 	}
 	return RetryAfter(err, backoff)
 }
 
-// sleepContext waits for d or until ctx is done.
+// sleepContext 等待 d，或等到 ctx 结束。
 func sleepContext(ctx context.Context, wait time.Duration) error {
 	if wait <= 0 {
 		return nil
@@ -269,10 +272,9 @@ func (c *Client) ensureGuest(ctx context.Context) (*DeviceProfile, error) {
 	return c.loadOrRegister(ctx, false)
 }
 
-// ensureSearchGuest registers again when a saved guest has no ttreq.
-// A register response that sets cookies but omits ttreq is an error.
-// A register response with no cookies leaves the ticket empty so fixture
-// calls can search without a guest cookie.
+// ensureSearchGuest 在已保存的游客没有 ttreq 时重新注册。
+// 注册响应设置了 cookie 却缺少 ttreq，视为错误。注册响应不带 cookie 时，
+// ticket 留空，这样 fixture 调用无需游客 cookie 也能搜索。
 func (c *Client) ensureSearchGuest(ctx context.Context) (*DeviceProfile, error) {
 	return c.loadOrRegister(ctx, true)
 }
@@ -285,8 +287,8 @@ func (c *Client) loadOrRegister(ctx context.Context, needTicket bool) (*DevicePr
 		return nil, err
 	}
 	if p != nil && p.Device == nil {
-		// A profile from before devices were stored keeps the client's
-		// device from now on, so its model does not change between runs.
+		// 在保存设备之前创建的档案，从此固定使用客户端的设备，
+		// 这样它的机型不会在不同运行之间变化。
 		d := c.device
 		p.Device = &d
 		if err = c.profileStore.Save(ctx, p); err != nil {
@@ -318,7 +320,7 @@ func (c *Client) loadOrRegister(ctx context.Context, needTicket bool) (*DevicePr
 		return nil, ErrSignerUnavailable
 	}
 	q := url.Values{}
-	// bdinstall.a1.k adds req_id before the encrypted register body appends tt_data=a.
+	// bdinstall.a1.k 先加上 req_id，加密的注册请求体再追加 tt_data=a。
 	q.Set("req_id", p.ReqID)
 	q.Set("tt_data", "a")
 	headers := map[string]string{
@@ -330,7 +332,7 @@ func (c *Client) loadOrRegister(ctx context.Context, needTicket bool) (*DevicePr
 		"x-vc-bdturing-sdk-version": "4.0.3.cn",
 		"x-ss-dp":                   protocol.AID,
 	}
-	// X-SS-STUB is a portable MD5 of the body. It is sent and never logged.
+	// X-SS-STUB 是请求体的可移植 MD5。它会被发送，但从不写入日志。
 	headers["X-SS-STUB"] = protocol.ContentMD5(body)
 	raw, cookies, err := c.do(ctx, "POST", c.registerOrigin, protocol.PathRegister, q, headers, body)
 	if err != nil {
@@ -385,7 +387,7 @@ func (c *Client) randomInt31() int32 {
 	return int32(binary.BigEndian.Uint32(b[:]) & 0x7fffffff)
 }
 
-// randomUUID returns a v4 UUID string for the session_uuid query parameter.
+// randomUUID 返回 v4 UUID 字符串，用作 session_uuid 查询参数。
 func randomUUID() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
@@ -396,7 +398,7 @@ func randomUUID() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
-// randInt64 returns a non-negative random value for jitter.
+// randInt64 返回一个非负随机数，用于抖动。
 func randInt64() (int64, error) {
 	var b [8]byte
 	if _, err := rand.Read(b[:]); err != nil {
@@ -406,9 +408,8 @@ func randInt64() (int64, error) {
 	return v, nil
 }
 
-// ResetDevice forgets the anonymous profile and registers a fresh device.
-// Callers use it when a request reports ErrDeviceRejected (BaseResp 263175 or
-// 263176).
+// ResetDevice 丢弃匿名档案并注册一台新设备。请求报告
+// ErrDeviceRejected（BaseResp 263175 或 263176）时，调用方使用它。
 func (c *Client) ResetDevice(ctx context.Context) error {
 	if c.profileStore == nil {
 		return ErrInvalidOptions
@@ -420,8 +421,7 @@ func (c *Client) ResetDevice(ctx context.Context) error {
 	return err
 }
 
-// identity is the device query identity of p: its registered ids and the
-// device it registered as.
+// identity 返回 p 的设备查询身份：注册所得的 id 和注册时使用的设备。
 func (c *Client) identity(p *DeviceProfile) protocol.SearchIdentity {
 	return protocol.SearchIdentity{
 		DeviceID: p.DeviceID, InstallID: p.InstallID, CDID: p.CDID, OpenUDID: p.OpenUDID,
@@ -429,8 +429,7 @@ func (c *Client) identity(p *DeviceProfile) protocol.SearchIdentity {
 	}
 }
 
-// deviceOf is the device p registered as, or the client's for a profile
-// that names none.
+// deviceOf 返回 p 注册时使用的设备；档案未指定设备时，返回客户端的设备。
 func (c *Client) deviceOf(p *DeviceProfile) model.Device {
 	if p != nil && p.Device != nil {
 		return p.Device.OrDefault()
