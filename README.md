@@ -24,6 +24,7 @@ SDK 用匿名设备发送所有请求，不需要登录。Go 以外的 SDK 都�
 | [Go 包文档](https://pkg.go.dev/github.com/beilunyang/openhongguo/sdk) | Go SDK 的完整 API（仓库公开后可用；现在用 `go doc ./sdk` 查看） |
 | [命令行文档](docs/cli.md) | 演示程序 `ohg` 的用法 |
 | [开发说明](docs/development.md) | 接口契约检查和持续集成 |
+| [发布手册](docs/release.md) | 发布新版本的步骤 |
 
 ## 安装
 

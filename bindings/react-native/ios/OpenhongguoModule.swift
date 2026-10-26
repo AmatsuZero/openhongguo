@@ -2,7 +2,7 @@ import ExpoModulesCore
 import Foundation
 import OpenhongguoCore
 
-/// openhongguo-react-native 的原生层，直接调用 gomobile 编译的 Go core。
+/// react-native-openhongguo 的原生层，直接调用 gomobile 编译的 Go core。
 /// SDK 的每个方法都经过 call(client, method, argsJson)，结果是 core 返回的
 /// JSON（{"result": …} 或 {"error": …}），由 JS 端解码。
 public class OpenhongguoModule: Module {

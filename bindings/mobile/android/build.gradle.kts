@@ -1,8 +1,9 @@
 // openhongguo 的 Android 库。先运行 ../build.sh android，把 Go 编译出的
 // core 库放进 libs/ 和 src/main/jniLibs/，再用 Gradle 构建。
 plugins {
-    id("com.android.library") version "8.12.0"
+    id("com.android.library") version "8.13.2"
     id("org.jetbrains.kotlin.android") version "2.1.20"
+    id("com.vanniktech.maven.publish") version "0.37.0"
 }
 
 android {
@@ -42,4 +43,40 @@ dependencies {
 
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
+}
+
+// 发布到 Maven Central：./gradlew publishToMavenCentral。凭据和签名密钥放在
+// ~/.gradle/gradle.properties：mavenCentralUsername、mavenCentralPassword、
+// signingInMemoryKey、signingInMemoryKeyPassword。没有签名密钥时不签名，
+// 只能发布到本地（./gradlew publishToMavenLocal）。
+mavenPublishing {
+    coordinates("io.github.beilunyang", "openhongguo", "0.1.0")
+    publishToMavenCentral()
+    if (providers.gradleProperty("signingInMemoryKey").isPresent) {
+        signAllPublications()
+    }
+    pom {
+        name.set("openhongguo")
+        description.set("红果短剧（Hongguo）的非官方 Android SDK：匿名浏览、搜索与播放，基于 Go SDK 编译的原生库")
+        inceptionYear.set("2026")
+        url.set("https://github.com/beilunyang/openhongguo")
+        licenses {
+            license {
+                name.set("Apache License 2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+            }
+        }
+        developers {
+            developer {
+                id.set("beilunyang")
+                name.set("beilunyang")
+                url.set("https://github.com/beilunyang")
+            }
+        }
+        scm {
+            url.set("https://github.com/beilunyang/openhongguo")
+            connection.set("scm:git:https://github.com/beilunyang/openhongguo.git")
+            developerConnection.set("scm:git:ssh://git@github.com/beilunyang/openhongguo.git")
+        }
+    }
 }

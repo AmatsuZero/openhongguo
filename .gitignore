@@ -15,3 +15,6 @@ tmpderive.go
 # reverse-engineering evidence (decompiled classes, frames): kept locally only
 docs/rea/*.json
 docs/rea/*.jpg
+
+# 发布产物：上传到 GitHub Release 的文件
+/dist/

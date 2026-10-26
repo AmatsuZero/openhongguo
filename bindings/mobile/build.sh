@@ -53,6 +53,23 @@ put_ios() {
 	cp -R "$out/OpenhongguoCore.xcframework" "$1/"
 }
 
+# put_ios_only DIR 把去掉 macOS 部分的 xcframework 放进 DIR。React Native 和
+# Flutter 只支持 iOS，macOS 部分约 18 MB，只会增大包的体积。
+put_ios_only() {
+	put_ios "$1"
+	xcf="$1/OpenhongguoCore.xcframework"
+	rm -rf "$xcf"/macos-*
+	python3 -I - "$xcf/Info.plist" <<'PY'
+import plistlib, sys
+path = sys.argv[1]
+with open(path, "rb") as f:
+    info = plistlib.load(f)
+info["AvailableLibraries"] = [l for l in info["AvailableLibraries"] if l["SupportedPlatform"] != "macos"]
+with open(path, "wb") as f:
+    plistlib.dump(info, f)
+PY
+}
+
 android() {
 	core_android
 	put_android "$here/android"
@@ -71,7 +88,7 @@ react_native() {
 	put_android "$here/../react-native/android"
 	if [ "$(uname)" = Darwin ]; then
 		core_ios
-		put_ios "$here/../react-native/ios"
+		put_ios_only "$here/../react-native/ios"
 	fi
 	echo "prepared $(cd "$here/../react-native" && pwd)"
 }
@@ -81,7 +98,7 @@ flutter() {
 	put_android "$here/../flutter/android"
 	if [ "$(uname)" = Darwin ]; then
 		core_ios
-		put_ios "$here/../flutter/ios"
+		put_ios_only "$here/../flutter/ios"
 	fi
 	echo "prepared $(cd "$here/../flutter" && pwd)"
 }

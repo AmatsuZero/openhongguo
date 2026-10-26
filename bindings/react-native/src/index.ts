@@ -1,4 +1,4 @@
-// openhongguo-react-native：红果短剧（Hongguo）的非官方 React Native SDK。
+// react-native-openhongguo：红果短剧（Hongguo）的非官方 React Native SDK。
 //
 // 原生层是 gomobile 编译的 Go SDK（Android 的 .so，iOS 的 xcframework），
 // 通过 Expo Modules 接入。接口与 Node.js 版 openhongguo 一致。

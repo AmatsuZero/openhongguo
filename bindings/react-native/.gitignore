@@ -5,3 +5,6 @@ android/src/main/jniLibs/
 android/build/
 ios/OpenhongguoCore.xcframework/
 build/
+# npm pack 时从仓库根目录复制
+LICENSE
+*.tgz

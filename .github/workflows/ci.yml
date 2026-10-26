@@ -83,6 +83,8 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      # pub.dev scores the same analysis after publishing.
+      - run: flutter analyze
       # Tests the client against a mocked platform channel.
       - run: flutter test
 
