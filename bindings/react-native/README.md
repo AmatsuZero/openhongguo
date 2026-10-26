@@ -34,36 +34,19 @@ console.log(playback.streams.map((s) => `${s.definition} ${s.url}`));
 | 原生代码 | 包含原生代码，不能在 Expo Go 中运行。用 `npx expo run:android` 或开发构建（development build）运行 |
 | 系统版本 | Android 5.0（API 21）或更高，iOS 15.1 或更高 |
 
-## 构建与安装
+## 安装
 
-> **注意**：这个包没有发布到 npm。使用前，从源码构建。
+如果要在 App 中安装这个包，执行以下步骤：
 
-构建需要 Go 1.26 或更高版本和 gomobile。环境要求见 [bindings/mobile/README.md](https://github.com/beilunyang/openhongguo/tree/main/bindings/mobile#构建)。
-
-如果要构建和安装这个包，执行以下步骤：
-
-1. 编译 Go core，并把它复制到 `android/` 和 `ios/`：
+1. 安装包：
 
    ```sh
-   ../mobile/build.sh react-native
+   npx expo install react-native-openhongguo
    ```
 
-2. 安装依赖，然后打包：
+2. 重新生成原生工程（`npx expo prebuild`），或者运行 `npx expo run:android`。
 
-   ```sh
-   npm install
-   npm pack
-   ```
-
-   `npm pack` 生成文件 `react-native-openhongguo-0.1.0.tgz`。
-
-3. 在你的 App 中安装这个文件：
-
-   ```sh
-   npm install /path/to/react-native-openhongguo-0.1.0.tgz
-   ```
-
-4. 重新生成原生工程（`npx expo prebuild`），或者运行 `npx expo run:android`。
+这个包已经包含编译好的原生库，不需要 Go 和 gomobile。
 
 包的大小主要来自 Go 运行时：
 
@@ -96,6 +79,22 @@ console.log(playback.streams.map((s) => `${s.definition} ${s.url}`));
 > **注意**：这个包不支持 Node.js SDK 的 `transport` 和 `timeoutMs`。Go 的 `net/http` 直接发送请求。每个请求的超时是 30 秒。
 
 ## 开发
+
+如果要从源码使用这个包，执行以下步骤：
+
+1. 编译 Go core，并把它复制到 `android/` 和 `ios/`。构建需要 Go 1.26 或更高版本和 gomobile，环境要求见 [bindings/mobile/README.md](https://github.com/beilunyang/openhongguo/tree/main/bindings/mobile#构建)：
+
+   ```sh
+   ../mobile/build.sh react-native
+   ```
+
+2. 打包，然后在 App 中安装生成的文件：
+
+   ```sh
+   npm install
+   npm pack
+   npm install /path/to/react-native-openhongguo-0.1.0.tgz
+   ```
 
 | 命令 | 作用 |
 |---|---|

@@ -28,30 +28,11 @@ console.log(playback.streams.map((s) => `${s.definition} ${s.url}`));
 
 ## 安装
 
-| 要求 | 版本 |
-|---|---|
-| Node.js | 20 或更高 |
-| Go（只在构建时需要） | 1.22 或更高 |
+需要 Node.js 20 或更高版本。
 
-> **注意**：这个包没有发布到 npm。使用前，从源码构建。
-
-如果要构建和安装这个包，执行以下步骤：
-
-1. 构建包，然后打包：
-
-   ```sh
-   cd bindings/node
-   npm run build
-   npm pack
-   ```
-
-   `npm pack` 生成文件 `openhongguo-0.1.0.tgz`。
-
-2. 在你的项目中安装这个文件：
-
-   ```sh
-   npm install /path/to/openhongguo-0.1.0.tgz
-   ```
+```sh
+npm install openhongguo
+```
 
 > **注意**：这个包只支持 ES 模块（`import`）。
 
@@ -287,7 +268,7 @@ try {
 
 ## 开发
 
-在本目录中运行以下命令。
+从源码构建需要 Go 1.22 或更高版本。在本目录中运行以下命令。
 
 | 命令 | 作用 |
 |---|---|

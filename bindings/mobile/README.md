@@ -40,9 +40,40 @@ for s in result.playback.streams { print(s.definition, s.url) }
 
 第一次请求时，SDK 注册一台匿名设备，并保存设备档案。以后的请求都使用这台匿名设备。
 
+## 安装
+
+### Android
+
+在 App 模块的构建文件中加入依赖。依赖来自 Maven Central：
+
+```kotlin
+dependencies {
+    implementation("io.github.beilunyang:openhongguo:0.1.0")
+}
+```
+
+kotlinx-coroutines 会随依赖一起引入。最低系统版本是 Android 5.0（API 21）。aar 已经声明网络权限，也包含混淆规则。不需要其他配置。
+
+### iOS 和 macOS
+
+如果要在 Xcode 中加入 Swift 包，执行以下步骤：
+
+1. 选择 File > Add Package Dependencies。
+2. 输入 `https://github.com/beilunyang/openhongguo`。
+3. 选择版本规则 Up to Next Major Version，从 0.1.0 开始。
+4. 把 `Openhongguo` 加入 App 的 target。
+
+也可以在 `Package.swift` 中加入依赖：
+
+```swift
+.package(url: "https://github.com/beilunyang/openhongguo.git", from: "0.1.0")
+```
+
+Swift 包从 GitHub Release 下载 Go 编译出的 xcframework。最低系统版本是 iOS 13 和 macOS 11。
+
 ## 构建
 
-> **注意**：这两个库没有发布。使用前，从源码构建。
+只有在修改 SDK，或者为 React Native 和 Flutter 准备原生库时，才需要从源码构建。
 
 构建需要以下工具：
 
@@ -72,42 +103,6 @@ for s in result.playback.streams { print(s.definition, s.url) }
    | `./build.sh react-native` | 把 core 复制到 `../react-native` |
    | `./build.sh flutter` | 把 core 复制到 `../flutter` |
    | `./build.sh` | 执行以上所有构建 |
-
-## 安装
-
-### Android
-
-如果要在 App 中使用 aar，执行以下步骤：
-
-1. 把 `openhongguo-release.aar` 复制到 App 模块的 `libs/` 目录。
-2. 在 App 模块的构建文件中加入依赖：
-
-   ```kotlin
-   dependencies {
-       implementation(files("libs/openhongguo-release.aar"))
-       implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-   }
-   ```
-
-> **注意**：本地 aar 不包含它的依赖。必须自己加入 kotlinx-coroutines。
-
-最低系统版本是 Android 5.0（API 21）。aar 已经声明网络权限，也包含混淆规则。不需要其他配置。
-
-### iOS
-
-如果要在 Xcode 中加入 Swift 包，执行以下步骤：
-
-1. 选择 File > Add Package Dependencies。
-2. 点击 Add Local。
-3. 选择 `ios/` 目录。
-
-也可以在 `Package.swift` 中用路径引用 Swift 包：
-
-```swift
-.package(path: "../openhongguo/bindings/mobile/ios")
-```
-
-最低系统版本是 iOS 13 和 macOS 11。
 
 ## 接口
 

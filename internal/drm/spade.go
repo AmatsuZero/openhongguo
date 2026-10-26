@@ -6,7 +6,7 @@
 // bytes with a fixed permutation and splits the result into a hex content key
 // and a short scheme version. That routine lives in the player's native
 // library; this package is a behaviour-compatible reimplementation validated
-// against a live episode (see docs/rea/playback-decrypt.md).
+// against a live episode.
 package drm
 
 import (

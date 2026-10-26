@@ -39,27 +39,13 @@ for (final s in result.playback.streams) {
 
 > **注意**：这个包不支持 Web 和桌面平台。
 
-## 构建与安装
+## 安装
 
-> **注意**：这个包没有发布到 pub.dev。使用前，从源码构建。
+```sh
+flutter pub add openhongguo
+```
 
-构建需要 Go 1.26 或更高版本和 gomobile。环境要求见 [bindings/mobile/README.md](https://github.com/beilunyang/openhongguo/tree/main/bindings/mobile#构建)。
-
-如果要构建和安装这个包，执行以下步骤：
-
-1. 编译 Go core，并把它复制到 `android/` 和 `ios/`：
-
-   ```sh
-   ../mobile/build.sh flutter
-   ```
-
-2. 在 App 的 `pubspec.yaml` 中用路径引用这个包：
-
-   ```yaml
-   dependencies:
-     openhongguo:
-       path: ../openhongguo/bindings/flutter
-   ```
+这个包已经包含编译好的原生库，不需要 Go 和 gomobile。
 
 包的大小主要来自 Go 运行时：
 
@@ -222,6 +208,22 @@ try {
 <!-- /gen:errors -->
 
 ## 开发
+
+如果要从源码使用这个包，执行以下步骤：
+
+1. 编译 Go core，并把它复制到 `android/` 和 `ios/`。构建需要 Go 1.26 或更高版本和 gomobile，环境要求见 [bindings/mobile/README.md](https://github.com/beilunyang/openhongguo/tree/main/bindings/mobile#构建)：
+
+   ```sh
+   ../mobile/build.sh flutter
+   ```
+
+2. 在 App 的 `pubspec.yaml` 中用路径引用这个包：
+
+   ```yaml
+   dependencies:
+     openhongguo:
+       path: ../openhongguo/bindings/flutter
+   ```
 
 > **注意**：不要手工修改 `lib/src/types.dart`。`go run ./bindings/mobile/gen` 生成这个文件。仓库根目录的 `go test ./...` 检查它是否过时。
 

@@ -1,5 +1,12 @@
 # openhongguo
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/beilunyang/openhongguo/sdk.svg)](https://pkg.go.dev/github.com/beilunyang/openhongguo/sdk)
+[![npm](https://img.shields.io/npm/v/openhongguo)](https://www.npmjs.com/package/openhongguo)
+[![npm react-native](https://img.shields.io/npm/v/react-native-openhongguo?label=npm%20react-native)](https://www.npmjs.com/package/react-native-openhongguo)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.beilunyang/openhongguo)](https://central.sonatype.com/artifact/io.github.beilunyang/openhongguo)
+[![pub.dev](https://img.shields.io/pub/v/openhongguo)](https://pub.dev/packages/openhongguo)
+[![CI](https://github.com/beilunyang/openhongguo/actions/workflows/ci.yml/badge.svg)](https://github.com/beilunyang/openhongguo/actions/workflows/ci.yml)
+
 openhongguo 是红果短剧（Hongguo）的非官方 SDK，提供 Go、Node.js、Android、iOS、React Native 和 Flutter 版本。SDK 可以浏览短剧目录、搜索短剧、读取短剧和分集的详情，并取得分集的播放地址和内容密钥。
 
 SDK 用匿名设备发送所有请求，不需要登录。Go 以外的 SDK 都由 Go SDK 编译而成，所以各语言的行为相同。
@@ -21,27 +28,21 @@ SDK 用匿名设备发送所有请求，不需要登录。Go 以外的 SDK 都�
 | 文档 | 内容 |
 |---|---|
 | [类型参考](docs/types.md) | 所有返回值和查询参数的字段 |
-| [Go 包文档](https://pkg.go.dev/github.com/beilunyang/openhongguo/sdk) | Go SDK 的完整 API（仓库公开后可用；现在用 `go doc ./sdk` 查看） |
+| [Go 包文档](https://pkg.go.dev/github.com/beilunyang/openhongguo/sdk) | Go SDK 的完整 API |
 | [命令行文档](docs/cli.md) | 演示程序 `ohg` 的用法 |
 | [开发说明](docs/development.md) | 接口契约检查和持续集成 |
 | [发布手册](docs/release.md) | 发布新版本的步骤 |
 
 ## 安装
 
-| 语言 | 安装方式 | 文档 |
-|---|---|---|
-| Go | `go get github.com/beilunyang/openhongguo` | 本文 |
-| Node.js | 从源码构建 npm 包 | [bindings/node](bindings/node/README.md) |
-| Android（Kotlin） | 从源码构建 aar | [bindings/mobile](bindings/mobile/README.md) |
-| iOS / macOS（Swift） | 本地 Swift 包 | [bindings/mobile](bindings/mobile/README.md) |
-| React Native | 从源码构建 npm 包 | [bindings/react-native](bindings/react-native/README.md) |
-| Flutter | 本地路径依赖 | [bindings/flutter](bindings/flutter/README.md) |
-
-> **注意**：仓库现在是私有的。安装 Go SDK 前，设置 `GOPRIVATE`：
->
-> ```sh
-> go env -w GOPRIVATE=github.com/beilunyang/openhongguo
-> ```
+| 语言 | 包 | 安装 | 文档 |
+|---|---|---|---|
+| Go | [`github.com/beilunyang/openhongguo`](https://pkg.go.dev/github.com/beilunyang/openhongguo/sdk) | `go get github.com/beilunyang/openhongguo@latest` | 本文 |
+| Node.js | [`openhongguo`](https://www.npmjs.com/package/openhongguo) | `npm install openhongguo` | [bindings/node](bindings/node/README.md) |
+| Android（Kotlin） | [`io.github.beilunyang:openhongguo`](https://central.sonatype.com/artifact/io.github.beilunyang/openhongguo) | `implementation("io.github.beilunyang:openhongguo:0.1.0")` | [bindings/mobile](bindings/mobile/README.md) |
+| iOS / macOS（Swift） | Swift Package | `.package(url: "https://github.com/beilunyang/openhongguo.git", from: "0.1.0")` | [bindings/mobile](bindings/mobile/README.md) |
+| React Native | [`react-native-openhongguo`](https://www.npmjs.com/package/react-native-openhongguo) | `npx expo install react-native-openhongguo` | [bindings/react-native](bindings/react-native/README.md) |
+| Flutter | [`openhongguo`](https://pub.dev/packages/openhongguo) | `flutter pub add openhongguo` | [bindings/flutter](bindings/flutter/README.md) |
 
 ## 要求
 
