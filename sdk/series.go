@@ -19,20 +19,20 @@ type EpisodeOptions struct {
 	PageSize int
 }
 
-// GetSeries 匿名加载一部剧。
+// GetSeries 加载一部短剧的详情。
 func (c *Client) GetSeries(ctx context.Context, seriesID string) (*model.Series, error) {
 	series, _, err := c.seriesDetail(ctx, seriesID)
 	return series, err
 }
 
-// seriesBatchSize 是一次批量请求查询的剧数。服务端接受 20，
+// seriesBatchSize 是一次批量请求查询的短剧数。服务端接受 20，
 // 拒绝 30 并返回 100001（2026-10-24 实测）；取 10 可让响应保持在约 1 MB 以内。
 const seriesBatchSize = 10
 
-// GetSeriesBatch 加载多部剧及其各集，按请求顺序返回。
+// GetSeriesBatch 加载多部短剧及其分集，按请求顺序返回。
 // 服务端不认识的 ID 会被略去；重复的 ID 只查询一次。
 //
-// 播放器的 multi_video_detail 读取接口为每部剧返回与 GetSeries 相同的结构；
+// 播放器的 multi_video_detail 读取接口为每部短剧返回与 GetSeries 相同的结构；
 // 更长的列表按 seriesBatchSize 分批请求。
 func (c *Client) GetSeriesBatch(ctx context.Context, seriesIDs []string) ([]model.SeriesDetail, error) {
 	var ids []string
@@ -80,7 +80,7 @@ func (c *Client) GetSeriesBatch(ctx context.Context, seriesIDs []string) ([]mode
 	return out, nil
 }
 
-// ListEpisodes 加载匿名的分集列表。集数从 1 开始。
+// ListEpisodes 加载一部短剧的分集列表。集数从 1 开始。
 func (c *Client) ListEpisodes(ctx context.Context, seriesID string, opts EpisodeOptions) (*Page[model.Episode], error) {
 	if opts.Cursor != "" || opts.PageSize < 0 {
 		return nil, fmt.Errorf("episode pagination is not verified")
@@ -144,12 +144,12 @@ func (c *Client) GetAlbum(ctx context.Context, albumID string, _ AlbumOptions) (
 	return protocol.ParseAlbum(raw, albumID)
 }
 
-// SeriesRecommend 加载一部剧的相关视频行。
+// SeriesRecommend 加载一部短剧的相关推荐。
 //
 // 该界面没有专门的 RPC：客户端复用通用的 plan feed（GET
 // /reading/bookapi/plan/v:version/），带上 from=select_panel_recommend 和
 // scene=10，再取 show_type 为 160 的那个 cell。匿名时，
-// 服务端返回一个通用的更多好剧 cell（show_type 401），其中的行不随该剧而定，
+// 服务端返回一个通用的更多好剧 cell（show_type 401），其中的行不随该短剧而定，
 // 每次调用都会变化，也不带 session id。
 func (c *Client) SeriesRecommend(ctx context.Context, seriesID string) (*model.Recommend, error) {
 	if !validID(seriesID) {
@@ -186,7 +186,7 @@ func (c *Client) SeriesRecommend(ctx context.Context, seriesID string) (*model.R
 	return nil, ErrContentUnavailable
 }
 
-// Seasons 列出多季作品的各季。
+// Seasons 列出多季短剧的全部季。
 //
 // 详情页的系列剧行列出所有季，包括即将上线的季。
 // 没有其他季的作品在那里会得到 101116。读不到该行时，

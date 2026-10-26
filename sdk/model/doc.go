@@ -1,4 +1,4 @@
-// Package model 存放 sdk 包返回的值：剧集、分集、播放模型、榜单，
+// Package model 存放 sdk 包返回的值：短剧、分集、播放模型、榜单，
 // 以及客户端出示的匿名设备。
 //
 // 各枚举（SeriesStatus、PayType、ContentType、PlatformType、InfoKind、

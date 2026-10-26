@@ -121,7 +121,7 @@ func browse(ctx context.Context, client *sdk.Client, rec *recorder, cfg Config, 
 	}
 	checks = append(checks, rec.check(cfg, "related", "plan-response.json", protocol.PathPlan, nonEmpty(n, "related list", err)))
 
-	// The default query is a multi-season title; a single-season one answers
+	// searchSeries prefers a multi-season title; a single-season one answers
 	// 101116 here and shows up as drift.
 	n = 0
 	rec.forget(protocol.PathPlan)
@@ -296,6 +296,16 @@ func searchSeries(ctx context.Context, client *sdk.Client, query string) (string
 	}
 	if len(page.Items) == 0 {
 		return "", fmt.Errorf("search %q found nothing", query)
+	}
+	// The seasons check needs a multi-season title, and the search order
+	// shifts from day to day; prefer the first of the top hits that is one.
+	for i, it := range page.Items {
+		if i == 5 {
+			break
+		}
+		if s, err := client.GetSeries(ctx, it.ID); err == nil && s.IsMultiSeason {
+			return it.ID, nil
+		}
 	}
 	return page.Items[0].ID, nil
 }

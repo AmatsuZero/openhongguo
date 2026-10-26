@@ -311,12 +311,12 @@ export interface NewReleasePage {
 }
 
 /**
- * Novel 是剧集改编自的小说。
+ * Novel 是短剧改编自的小说。
  */
 export interface Novel {
   book_id: string;
   /**
-   * Title 是小说本身的名称；ShortTitle 是它与剧集共用的名称。
+   * Title 是小说本身的名称；ShortTitle 是它与短剧共用的名称。
    */
   title: string;
   short_title?: string;
@@ -555,7 +555,7 @@ export interface Ranking {
 }
 
 /**
- * Recommend 是一部剧集的相关视频单元：包含各行、单元标题，
+ * Recommend 是一部短剧的相关视频单元：包含各行、单元标题，
  * 以及客户端为后续请求保留的分页会话。
  */
 export interface Recommend {
@@ -580,7 +580,7 @@ export interface Season {
 }
 
 /**
- * Series 是一部匿名剧集的详情视图。
+ * Series 是一部短剧的详情视图。
  */
 export interface Series extends SeriesSummary {
   /**
@@ -598,7 +598,7 @@ export interface Series extends SeriesSummary {
    */
   heat?: number;
   /**
-   * PlayCount 是剧集的总播放量（series_play_cnt）。
+   * PlayCount 是短剧的总播放量（series_play_cnt）。
    */
   play_count?: number;
   /**
@@ -635,7 +635,7 @@ export interface Series extends SeriesSummary {
    */
   related_album_id?: string;
   /**
-   * RelatedNovelBookID 是剧集改编的小说（如已公开）。
+   * RelatedNovelBookID 是短剧改编的小说（如已公开）。
    */
   related_novel_book_id?: string;
   /**
@@ -649,7 +649,7 @@ export interface Series extends SeriesSummary {
 }
 
 /**
- * SeriesDetail 是一部剧集及其分集，由批量读取返回。
+ * SeriesDetail 是一部短剧及其分集，由批量读取返回。
  */
 export interface SeriesDetail {
   series: Series;
@@ -657,15 +657,15 @@ export interface SeriesDetail {
 }
 
 /**
- * SeriesStatus 是剧集的发布状态，由 data.video_data.series_status 携带。
+ * SeriesStatus 是短剧的发布状态，由 data.video_data.series_status 携带。
  *
  * 名称取自官方 App 的枚举 com.dragon.read.rpc.model.SeriesStatus（
  * SeriesUpdating、SeriesEnd、SeriesUpdateTaday、SeriesUpdateStop）；
  * 值 0 和 1 也已在线上实测。
  *
  * 取值：
- * - SeriesUpdating = 0：SeriesUpdating 是未完结的剧集（"更新至 N 集"）。
- * - SeriesEnd = 1：SeriesEnd 是已完结的剧集（"全 N 集"）。
+ * - SeriesUpdating = 0：SeriesUpdating 是未完结的短剧（"更新至 N 集"）。
+ * - SeriesEnd = 1：SeriesEnd 是已完结的短剧（"全 N 集"）。
  * - SeriesUpdatedToday = 3：SeriesUpdatedToday 是枚举中的“今日更新”状态（推断）。
  * - SeriesUpdateStopped = 4：SeriesUpdateStopped 是枚举中的“停止更新”状态（推断）。
  */
@@ -700,7 +700,7 @@ export interface ShortFilterPage {
   items: SeriesSummary[];
   has_more: boolean;
   /**
-   * Cursor 用于续取列表；它携带已展示的剧集，服务端会跳过它们。
+   * Cursor 用于续取列表；它携带已展示的短剧，服务端会跳过它们。
    */
   cursor?: string;
 }
@@ -778,7 +778,7 @@ export interface Suggestion {
 }
 
 /**
- * Work 是某人出演的一部剧集。
+ * Work 是某人出演的一部短剧。
  */
 export interface Work {
   series_id: string;
@@ -792,7 +792,7 @@ export interface Work {
    */
   tags?: string[];
   /**
-   * Heat 是剧集的原始热度分；Plays 是其播放量。
+   * Heat 是短剧的原始热度分；Plays 是其播放量。
    */
   heat?: number;
   plays?: number;

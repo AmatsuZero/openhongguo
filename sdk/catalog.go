@@ -48,7 +48,7 @@ const (
 	SearchFilterUnwatched = "search_range_unread"           // 未看过
 )
 
-// Discover 加载一个匿名的书城频道。首页由 tab 预加载和第一个不限量的
+// Discover 加载书城的一个频道，默认是“推荐”。首页由 tab 预加载和第一个不限量的
 // cell/change 页组成。带游标时只加载下一个 cell/change 页。
 func (c *Client) Discover(ctx context.Context, opts DiscoverOptions) (*Page[model.SeriesSummary], error) {
 	channel, err := protocol.ResolveDiscoverChannel(opts.Channel)
@@ -150,7 +150,7 @@ func mergeSeries(base, extra []model.SeriesSummary) []model.SeriesSummary {
 	return out
 }
 
-// Search 加载 query 的匿名短剧搜索结果。
+// Search 搜索短剧，可以按真人剧、漫剧等筛选。
 func (c *Client) Search(ctx context.Context, query string, opts SearchOptions) (*Page[model.SeriesSummary], error) {
 	if query == "" {
 		return nil, fmt.Errorf("missing search query")
@@ -275,7 +275,8 @@ func NewPager(cursor string, fetch func(ctx context.Context, cursor string) (*Pa
 	return &Pager{seen: map[string]struct{}{}, next: cursor, fetch: fetch}
 }
 
-// DiscoverPager 从 opts.Cursor 开始遍历一个书城频道。
+// DiscoverPager 逐页遍历书城的一个频道，并去掉跨页重复的短剧。
+// 遍历从 opts.Cursor 开始。
 func (c *Client) DiscoverPager(opts DiscoverOptions) *Pager {
 	return NewPager(opts.Cursor, func(ctx context.Context, cursor string) (*Page[model.SeriesSummary], error) {
 		o := opts
@@ -284,7 +285,8 @@ func (c *Client) DiscoverPager(opts DiscoverOptions) *Pager {
 	})
 }
 
-// SearchPager 从 opts.Cursor 开始遍历一个搜索 tab。
+// SearchPager 逐页遍历搜索结果，并去掉跨页重复的短剧。
+// 遍历从 opts.Cursor 开始。
 func (c *Client) SearchPager(query string, opts SearchOptions) *Pager {
 	return NewPager(opts.Cursor, func(ctx context.Context, cursor string) (*Page[model.SeriesSummary], error) {
 		o := opts
@@ -322,7 +324,7 @@ func (p *Pager) Next(ctx context.Context) (items []model.SeriesSummary, more boo
 // Seen 返回 pager 已返回的不同行数。
 func (p *Pager) Seen() int { return len(p.seen) }
 
-// Suggest 返回某个前缀的搜索联想。
+// Suggest 返回某个前缀的搜索联想词。
 //
 // 路径取自随 app 发布的 sug 页面：
 // GET /reading/bookapi/search/suggest/v:version/。响应结构按宽松方式解析，
@@ -345,7 +347,7 @@ func (c *Client) Suggest(ctx context.Context, prefix string) ([]model.Suggestion
 	return protocol.ParseSuggest(raw)
 }
 
-// SearchCues 加载搜索框轮播的提示词。
+// SearchCues 加载搜索框里轮播的提示词。
 //
 // 路径和请求字段取自随 app 发布的客户端：
 // GET /reading/bookapi/search/cue/v:version/，带 cue_type、limit、
@@ -365,8 +367,8 @@ func (c *Client) SearchCues(ctx context.Context) ([]string, error) {
 	return protocol.ParseCue(raw)
 }
 
-// HotSearch 加载输入查询之前的搜索页：猜你想搜和各个热榜（短剧热搜榜、
-// 漫剧热搜榜、热点话题榜，有时还有短剧新剧榜）。
+// HotSearch 加载搜索页的“猜你想搜”和各个热搜榜。
+// 热搜榜有短剧热搜榜、漫剧热搜榜、热点话题榜，有时还有短剧新剧榜。
 //
 // 该页是带 from=search_input_page 的 plan feed；
 // 其中的行位于一个 Lynx cell 的 lynx_data 中（2026-10-24 抓包）。
@@ -399,8 +401,8 @@ type NewReleaseQuery struct {
 	Cursor string
 }
 
-// NewReleases 加载上新日历的一页：某天上线的作品和预告在当天上线的作品，
-// 以及日历提供的日期。
+// NewReleases 加载上新日历的一页。
+// 一页包括某天上线的作品、预告在当天上线的作品，以及日历提供的日期。
 //
 // 该页是 /reading/user/subscribe/list/，带 tab_type 5 和
 // target_date（2026-10-24 抓包）；匿名设备拿到的是公开日历，

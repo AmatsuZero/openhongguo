@@ -11,32 +11,43 @@ import (
 // 以下是哨兵错误，调用方可用 errors.Is 匹配。认证与 DRM 分开处理，
 // 受保护的媒体响应不会被当作登录失败；两条路径都不会解密或解锁内容。
 var (
-	ErrInvalidOptions         = errors.New("openhongguo: invalid client options")
-	ErrProfileNotFound        = errors.New("openhongguo: profile not found")
-	ErrSignerUnavailable      = errors.New("openhongguo: signer unavailable")
+	// ErrInvalidOptions 表示客户端的设置或调用参数无效。
+	ErrInvalidOptions = errors.New("openhongguo: invalid client options")
+	// ErrProfileNotFound 表示还没有保存过设备档案。ProfileStore 首次读取时返回它。
+	ErrProfileNotFound = errors.New("openhongguo: profile not found")
+	// ErrSignerUnavailable 表示请求需要签名，而客户端没有可用的签名器。
+	ErrSignerUnavailable = errors.New("openhongguo: signer unavailable")
+	// ErrAuthenticationRequired 表示内容需要登录才能访问，匿名客户端无法继续。
 	ErrAuthenticationRequired = errors.New("openhongguo: authentication required")
-	ErrDRMProtected           = errors.New("openhongguo: DRM protected")
-	// ErrNotProtected 表示为未加密的模型请求了内容密钥。
-	ErrNotProtected      = errors.New("openhongguo: playback is not encrypted")
-	ErrAnonymousLimited  = errors.New("openhongguo: anonymous response was empty")
-	ErrRateLimited       = errors.New("openhongguo: rate limited")
-	ErrTransport         = errors.New("openhongguo: transport failure")
+	// ErrDRMProtected 表示分集是加密的，需要内容密钥才能解密。
+	// ResolvePlayback 返回它时，播放模型照常返回，交给 ContentKey 取得密钥。
+	ErrDRMProtected = errors.New("openhongguo: DRM protected")
+	// ErrNotProtected 表示为未加密的播放模型请求了内容密钥。
+	ErrNotProtected = errors.New("openhongguo: playback is not encrypted")
+	// ErrAnonymousLimited 表示服务端给匿名设备返回了空结果。
+	ErrAnonymousLimited = errors.New("openhongguo: anonymous response was empty")
+	// ErrRateLimited 表示请求太频繁，被服务端限流。
+	ErrRateLimited = errors.New("openhongguo: rate limited")
+	// ErrTransport 表示网络请求失败。
+	ErrTransport = errors.New("openhongguo: transport failure")
+	// ErrSignatureRejected 表示服务端拒绝了请求的签名。
 	ErrSignatureRejected = errors.New("openhongguo: signature rejected")
-	// ErrContentUnavailable 涵盖内容类失败：已下架、不存在，
-	// 或当前调用方无权访问（101001、101104、101109、101115……）。
+	// ErrContentUnavailable 表示内容已下架、不存在，或当前调用方无权访问。
+	// 服务端的错误码有 101001、101104、101109、101115 等。
 	ErrContentUnavailable = errors.New("openhongguo: content unavailable")
-	// ErrParamInvalid 表示请求被拒绝（100103、4000、101142）。
+	// ErrParamInvalid 表示服务端认为请求参数无效。
+	// 服务端的错误码有 100103、4000 和 101142。
 	ErrParamInvalid = errors.New("openhongguo: invalid request")
-	// ErrChallengeRequired 表示服务端要求验证码或其他验证（111
-	// HIT_VERIFY_CODE），匿名客户端无法继续。
+	// ErrChallengeRequired 表示服务端要求验证码或其他验证，匿名客户端无法继续。
+	// 对应 111 HIT_VERIFY_CODE。
 	ErrChallengeRequired = errors.New("openhongguo: verification required")
-	// ErrDeviceRejected 表示匿名设备或安装 id 被拒绝
-	// （BaseResp 263175/263176），必须重新注册。
+	// ErrDeviceRejected 表示匿名设备被拒绝，需要重置设备后重新注册。
+	// 重置用 ResetDevice。对应 BaseResp 263175 和 263176。
 	ErrDeviceRejected = errors.New("openhongguo: device rejected")
-	// ErrEndOfList 即 101 ALL_CONTENT_SHOWN：分页接口已无更多内容。
+	// ErrEndOfList 表示列表已经没有更多内容。对应 101 ALL_CONTENT_SHOWN。
 	ErrEndOfList = errors.New("openhongguo: no more content")
-	// ErrAlbumUnavailable 表示匿名接口不提供该合集
-	// （所有抽样合集均返回 101001），或该作品没有其他季。
+	// ErrAlbumUnavailable 表示匿名读取不到这个合集，或者这部短剧没有其他季。
+	// 所有抽样的合集都返回 101001。
 	ErrAlbumUnavailable = errors.New("openhongguo: album is not available anonymously")
 )
 

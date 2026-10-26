@@ -655,10 +655,10 @@ public struct NewReleasePage: Codable, Hashable, Sendable {
     }
 }
 
-/// Novel 是剧集改编自的小说。
+/// Novel 是短剧改编自的小说。
 public struct Novel: Codable, Hashable, Sendable {
     public var bookId: String
-    /// Title 是小说本身的名称；ShortTitle 是它与剧集共用的名称。
+    /// Title 是小说本身的名称；ShortTitle 是它与短剧共用的名称。
     public var title: String
     public var shortTitle: String
     public var status: NovelStatus
@@ -1141,7 +1141,7 @@ public struct Ranking: Codable, Hashable, Sendable {
     }
 }
 
-/// Recommend 是一部剧集的相关视频单元：包含各行、单元标题，
+/// Recommend 是一部短剧的相关视频单元：包含各行、单元标题，
 /// 以及客户端为后续请求保留的分页会话。
 public struct Recommend: Codable, Hashable, Sendable {
     public var cellTitle: String
@@ -1207,7 +1207,7 @@ public struct Season: Codable, Hashable, Sendable {
     }
 }
 
-/// Series 是一部匿名剧集的详情视图。
+/// Series 是一部短剧的详情视图。
 public struct Series: Codable, Hashable, Sendable {
     public var id: String
     public var title: String
@@ -1229,7 +1229,7 @@ public struct Series: Codable, Hashable, Sendable {
     public var platform: PlatformType
     /// Heat 是原始热度分；App 将其显示为 "红果热度值N万"。
     public var heat: Int
-    /// PlayCount 是剧集的总播放量（series_play_cnt）。
+    /// PlayCount 是短剧的总播放量（series_play_cnt）。
     public var playCount: Int
     /// FollowCount 和 DiggCount 是标题旁显示的计数。
     public var followCount: Int
@@ -1248,7 +1248,7 @@ public struct Series: Codable, Hashable, Sendable {
     public var seasonIndex: Int
     /// RelatedAlbumID 是各季共用的合集 id。
     public var relatedAlbumId: String
-    /// RelatedNovelBookID 是剧集改编的小说（如已公开）。
+    /// RelatedNovelBookID 是短剧改编的小说（如已公开）。
     public var relatedNovelBookId: String
     /// Novel 是详情页链接的原著小说（video_relate_book），服务端给出时才有。
     public var novel: Novel?
@@ -1347,7 +1347,7 @@ public struct Series: Codable, Hashable, Sendable {
     }
 }
 
-/// SeriesDetail 是一部剧集及其分集，由批量读取返回。
+/// SeriesDetail 是一部短剧及其分集，由批量读取返回。
 public struct SeriesDetail: Codable, Hashable, Sendable {
     public var series: Series?
     public var episodes: [Episode]
@@ -1369,7 +1369,7 @@ public struct SeriesDetail: Codable, Hashable, Sendable {
     }
 }
 
-/// SeriesStatus 是剧集的发布状态，由 data.video_data.series_status 携带。
+/// SeriesStatus 是短剧的发布状态，由 data.video_data.series_status 携带。
 ///
 /// 名称取自官方 App 的枚举 com.dragon.read.rpc.model.SeriesStatus（
 /// SeriesUpdating、SeriesEnd、SeriesUpdateTaday、SeriesUpdateStop）；
@@ -1381,9 +1381,9 @@ public struct SeriesStatus: RawRepresentable, Codable, Hashable, Sendable {
         self.rawValue = rawValue
     }
 
-    /// SeriesUpdating 是未完结的剧集（"更新至 N 集"）。
+    /// SeriesUpdating 是未完结的短剧（"更新至 N 集"）。
     public static let updating = SeriesStatus(rawValue: 0)
-    /// SeriesEnd 是已完结的剧集（"全 N 集"）。
+    /// SeriesEnd 是已完结的短剧（"全 N 集"）。
     public static let end = SeriesStatus(rawValue: 1)
     /// SeriesUpdatedToday 是枚举中的“今日更新”状态（推断）。
     public static let updatedToday = SeriesStatus(rawValue: 3)
@@ -1448,7 +1448,7 @@ public struct SeriesSummary: Codable, Hashable, Sendable {
 public struct ShortFilterPage: Codable, Hashable, Sendable {
     public var items: [SeriesSummary]
     public var hasMore: Bool
-    /// Cursor 用于续取列表；它携带已展示的剧集，服务端会跳过它们。
+    /// Cursor 用于续取列表；它携带已展示的短剧，服务端会跳过它们。
     public var cursor: String
 
     public init(items: [SeriesSummary] = [], hasMore: Bool = false, cursor: String = "") {
@@ -1618,7 +1618,7 @@ public struct Suggestion: Codable, Hashable, Sendable {
     }
 }
 
-/// Work 是某人出演的一部剧集。
+/// Work 是某人出演的一部短剧。
 public struct Work: Codable, Hashable, Sendable {
     public var seriesId: String
     public var title: String
@@ -1628,7 +1628,7 @@ public struct Work: Codable, Hashable, Sendable {
     public var episodeCount: Int
     /// Tags 是卡片上的各行，例如 "爱情" 和 "70集"。
     public var tags: [String]
-    /// Heat 是剧集的原始热度分；Plays 是其播放量。
+    /// Heat 是短剧的原始热度分；Plays 是其播放量。
     public var heat: Int
     public var plays: Int
 

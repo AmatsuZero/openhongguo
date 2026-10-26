@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/beilunyang/openhongguo/sdk"
 	"github.com/beilunyang/openhongguo/sdk/model"
@@ -179,6 +180,16 @@ var methods = map[string]method{
 	},
 }
 
+// Methods 返回全部方法名，按字母排序。
+func Methods() []string {
+	names := make([]string, 0, len(methods))
+	for n := range methods {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return names
+}
+
 // Call 调用名为 name 的方法，raw 是参数数组的 JSON（可以为空）。
 // 结果可以直接编码成 JSON；ctx 取消时，进行中的请求随之取消。
 func Call(ctx context.Context, c *sdk.Client, name, raw string) (any, error) {
@@ -228,11 +239,15 @@ func oneString(f func(context.Context, *sdk.Client, string) (any, error)) method
 	}
 }
 
-// errorCodes 把 SDK 的哨兵错误映射成绑定使用的错误码。
-var errorCodes = []struct {
-	err  error
-	code string
-}{
+// ErrorCode 是绑定使用的一个错误码，以及它对应的错误。
+type ErrorCode struct {
+	Err  error
+	Code string
+}
+
+// ErrorCodes 把 SDK 的哨兵错误映射成绑定使用的错误码，按匹配的先后排列。
+// 文档生成器也读取它。
+var ErrorCodes = []ErrorCode{
 	// 取消排在最前：取消导致的失败可能同时包装了其他哨兵错误。
 	{context.Canceled, "CANCELLED"},
 	{sdk.ErrInvalidOptions, "INVALID_OPTIONS"},
@@ -257,9 +272,9 @@ var errorCodes = []struct {
 // 不对应任何哨兵错误时，code 是 "UNKNOWN"。
 func Error(err error) map[string]any {
 	code := "UNKNOWN"
-	for _, e := range errorCodes {
-		if errors.Is(err, e.err) {
-			code = e.code
+	for _, e := range ErrorCodes {
+		if errors.Is(err, e.Err) {
+			code = e.Code
 			break
 		}
 	}

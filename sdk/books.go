@@ -11,7 +11,7 @@ import (
 	"github.com/beilunyang/openhongguo/sdk/model"
 )
 
-// Categories 加载一个分类的框架：全部/男生/女生 tab 和默认 tab。
+// Categories 加载书籍分类的标签页：全部、男生、女生和默认标签页。
 // 线上服务在这里不返回行（2026-10-24 实测）；列表及其筛选来自 CategoryLanding。
 //
 // 路径和请求类取自 APK：GetNewCategoryFrontPageRequest 发往
@@ -46,8 +46,8 @@ type LandingOptions struct {
 	Cursor  string
 }
 
-// CategoryLanding 加载分类落地列表的一页及其筛选面板。这些行是书（小说），
-// 不是短剧。
+// CategoryLanding 加载书籍分类下列表的一页，以及它的筛选面板。
+// 这些行是书（小说），不是短剧。
 func (c *Client) CategoryLanding(ctx context.Context, categoryID string, opts LandingOptions) (*model.CategoryPage, error) {
 	if strings.TrimSpace(categoryID) == "" {
 		return nil, fmt.Errorf("missing category ID")

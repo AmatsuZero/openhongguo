@@ -40,14 +40,15 @@ func TestShapeWalksArraysAndEmbeddedJSON(t *testing.T) {
 }
 
 func TestCompareReportsMissingAndRetypedFields(t *testing.T) {
-	fixture, _ := Shape([]byte(`{"a":{"id":"1","n":2,"tags":[]},"gone":true}`))
-	live, _ := Shape([]byte(`{"a":{"id":1,"n":3,"tags":["x"],"extra":"ignored"}}`))
+	fixture, _ := Shape([]byte(`{"a":{"id":"1","n":2,"tags":[],"label":"x","list":[1]},"gone":true}`))
+	live, _ := Shape([]byte(`{"a":{"id":1,"n":3,"tags":["x"],"label":null,"list":null,"extra":"ignored"}}`))
 	drifts := Compare(fixture, live)
 	got := make([]string, len(drifts))
 	for i, d := range drifts {
 		got[i] = d.String()
 	}
-	want := "a.id: type number, fixture has string; gone: missing (fixture has bool)"
+	// A null label is an unset optional field; a null list loses the list.
+	want := "a.id: type number, fixture has string; a.list[]: missing (fixture has number); gone: missing (fixture has bool)"
 	if strings.Join(got, "; ") != want {
 		t.Fatalf("drifts = %q", got)
 	}

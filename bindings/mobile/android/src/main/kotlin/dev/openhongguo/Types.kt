@@ -598,10 +598,10 @@ data class NewReleasePage(
     }
 }
 
-/** Novel 是剧集改编自的小说。 */
+/** Novel 是短剧改编自的小说。 */
 data class Novel(
     val bookId: String = "",
-    /** Title 是小说本身的名称；ShortTitle 是它与剧集共用的名称。 */
+    /** Title 是小说本身的名称；ShortTitle 是它与短剧共用的名称。 */
     val title: String = "",
     val shortTitle: String = "",
     val status: NovelStatus = NovelStatus(0),
@@ -1028,7 +1028,7 @@ data class Ranking(
 }
 
 /**
- * Recommend 是一部剧集的相关视频单元：包含各行、单元标题，
+ * Recommend 是一部短剧的相关视频单元：包含各行、单元标题，
  * 以及客户端为后续请求保留的分页会话。
  */
 data class Recommend(
@@ -1086,7 +1086,7 @@ data class Season(
     }
 }
 
-/** Series 是一部匿名剧集的详情视图。 */
+/** Series 是一部短剧的详情视图。 */
 data class Series(
     val id: String = "",
     val title: String = "",
@@ -1110,7 +1110,7 @@ data class Series(
     val platform: PlatformType = PlatformType(0),
     /** Heat 是原始热度分；App 将其显示为 "红果热度值N万"。 */
     val heat: Long = 0L,
-    /** PlayCount 是剧集的总播放量（series_play_cnt）。 */
+    /** PlayCount 是短剧的总播放量（series_play_cnt）。 */
     val playCount: Long = 0L,
     /** FollowCount 和 DiggCount 是标题旁显示的计数。 */
     val followCount: Long = 0L,
@@ -1129,7 +1129,7 @@ data class Series(
     val seasonIndex: Int = 0,
     /** RelatedAlbumID 是各季共用的合集 id。 */
     val relatedAlbumId: String = "",
-    /** RelatedNovelBookID 是剧集改编的小说（如已公开）。 */
+    /** RelatedNovelBookID 是短剧改编的小说（如已公开）。 */
     val relatedNovelBookId: String = "",
     /** Novel 是详情页链接的原著小说（video_relate_book），服务端给出时才有。 */
     val novel: Novel? = null,
@@ -1201,7 +1201,7 @@ data class Series(
     }
 }
 
-/** SeriesDetail 是一部剧集及其分集，由批量读取返回。 */
+/** SeriesDetail 是一部短剧及其分集，由批量读取返回。 */
 data class SeriesDetail(
     val series: Series? = null,
     val episodes: List<Episode> = emptyList(),
@@ -1222,7 +1222,7 @@ data class SeriesDetail(
 }
 
 /**
- * SeriesStatus 是剧集的发布状态，由 data.video_data.series_status 携带。
+ * SeriesStatus 是短剧的发布状态，由 data.video_data.series_status 携带。
  *
  * 名称取自官方 App 的枚举 com.dragon.read.rpc.model.SeriesStatus（
  * SeriesUpdating、SeriesEnd、SeriesUpdateTaday、SeriesUpdateStop）；
@@ -1231,9 +1231,9 @@ data class SeriesDetail(
 @JvmInline
 value class SeriesStatus(val value: Int) {
     companion object {
-        /** SeriesUpdating 是未完结的剧集（"更新至 N 集"）。 */
+        /** SeriesUpdating 是未完结的短剧（"更新至 N 集"）。 */
         val UPDATING = SeriesStatus(0)
-        /** SeriesEnd 是已完结的剧集（"全 N 集"）。 */
+        /** SeriesEnd 是已完结的短剧（"全 N 集"）。 */
         val END = SeriesStatus(1)
         /** SeriesUpdatedToday 是枚举中的“今日更新”状态（推断）。 */
         val UPDATED_TODAY = SeriesStatus(3)
@@ -1292,7 +1292,7 @@ data class SeriesSummary(
 data class ShortFilterPage(
     val items: List<SeriesSummary> = emptyList(),
     val hasMore: Boolean = false,
-    /** Cursor 用于续取列表；它携带已展示的剧集，服务端会跳过它们。 */
+    /** Cursor 用于续取列表；它携带已展示的短剧，服务端会跳过它们。 */
     val cursor: String = "",
 ) {
     /** 编码成与 Go SDK 相同的 JSON。 */
@@ -1442,7 +1442,7 @@ data class Suggestion(
     }
 }
 
-/** Work 是某人出演的一部剧集。 */
+/** Work 是某人出演的一部短剧。 */
 data class Work(
     val seriesId: String = "",
     val title: String = "",
@@ -1452,7 +1452,7 @@ data class Work(
     val episodeCount: Int = 0,
     /** Tags 是卡片上的各行，例如 "爱情" 和 "70集"。 */
     val tags: List<String> = emptyList(),
-    /** Heat 是剧集的原始热度分；Plays 是其播放量。 */
+    /** Heat 是短剧的原始热度分；Plays 是其播放量。 */
     val heat: Long = 0L,
     val plays: Long = 0L,
 ) {

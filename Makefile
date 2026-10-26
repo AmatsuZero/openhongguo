@@ -28,10 +28,11 @@ node: ## 构建 Node.js 包（wasm）
 mobile: ## 编译 Go core，构建 Android、iOS、React Native 和 Flutter 包
 	bindings/mobile/build.sh all
 
-gen: ## 修改 sdk 的类型后，重新生成各语言的类型
+gen: ## 修改 sdk 的类型或注释后，重新生成各语言的类型和文档
 	go run ./bindings/node/tsgen > bindings/node/types.d.ts
 	go run ./bindings/node/tsgen > bindings/react-native/src/types.ts
 	go run ./bindings/mobile/gen
+	go run ./bindings/docgen
 
 test: test-go test-node test-react-native test-flutter ## 运行不需要移动端工具链的全部测试
 

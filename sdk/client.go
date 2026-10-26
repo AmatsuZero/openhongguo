@@ -408,7 +408,7 @@ func randInt64() (int64, error) {
 	return v, nil
 }
 
-// ResetDevice 丢弃匿名档案并注册一台新设备。请求报告
+// ResetDevice 丢弃当前匿名设备，并注册一台新设备。请求报告
 // ErrDeviceRejected（BaseResp 263175 或 263176）时，调用方使用它。
 func (c *Client) ResetDevice(ctx context.Context) error {
 	if c.profileStore == nil {

@@ -14,7 +14,7 @@ import (
 // 第二阶段按服务端下发的原样解析模型，由调用方挑选流。
 type PlaybackOptions struct{}
 
-// ResolvePlayback 加载一集的匿名媒体模型。
+// ResolvePlayback 加载一集的播放模型：各清晰度的地址、编码和码率。
 //
 // 请求就是官方客户端发出的、带签名的 video_model 调用。
 // 响应是客户端的 TTVideoEngine 模型。受保护的模型会和 ErrDRMProtected
@@ -49,8 +49,8 @@ func (c *Client) ResolvePlayback(ctx context.Context, episodeID string, _ Playba
 	return playback, nil
 }
 
-// ContentKey 恢复受保护播放模型的内容密钥，即 ResolvePlayback 连同
-// ErrDRMProtected 一起返回的模型。这是纯本地计算：
+// ContentKey 从播放模型算出加密分集的内容密钥。
+// 播放模型就是 ResolvePlayback 连同 ErrDRMProtected 一起返回的那个。这是纯本地计算：
 // 按官方播放器的方式从模型的 KeyMaterial 解包出密钥，不再发出任何请求。
 // 模型的所有流共用这个密钥（同一集的每种清晰度都带有相同的 spade_a 和 kid，
 // 2026-10-24 观察）。

@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-// SeriesStatus 是剧集的发布状态，由 data.video_data.series_status 携带。
+// SeriesStatus 是短剧的发布状态，由 data.video_data.series_status 携带。
 //
 // 名称取自官方 App 的枚举 com.dragon.read.rpc.model.SeriesStatus（
 // SeriesUpdating、SeriesEnd、SeriesUpdateTaday、SeriesUpdateStop）；
@@ -10,9 +10,9 @@ import "time"
 type SeriesStatus int
 
 const (
-	// SeriesUpdating 是未完结的剧集（"更新至 N 集"）。
+	// SeriesUpdating 是未完结的短剧（"更新至 N 集"）。
 	SeriesUpdating SeriesStatus = 0
-	// SeriesEnd 是已完结的剧集（"全 N 集"）。
+	// SeriesEnd 是已完结的短剧（"全 N 集"）。
 	SeriesEnd SeriesStatus = 1
 	// SeriesUpdatedToday 是枚举中的“今日更新”状态（推断）。
 	SeriesUpdatedToday SeriesStatus = 3
@@ -260,7 +260,7 @@ type SeriesSummary struct {
 	Words    int64  `json:"words,omitempty"`
 }
 
-// Series 是一部匿名剧集的详情视图。
+// Series 是一部短剧的详情视图。
 type Series struct {
 	SeriesSummary
 	// Status 是发布状态；PayType 是付费墙状态。
@@ -271,7 +271,7 @@ type Series struct {
 	Platform    PlatformType `json:"platform,omitempty"`
 	// Heat 是原始热度分；App 将其显示为 "红果热度值N万"。
 	Heat int64 `json:"heat,omitempty"`
-	// PlayCount 是剧集的总播放量（series_play_cnt）。
+	// PlayCount 是短剧的总播放量（series_play_cnt）。
 	PlayCount int64 `json:"play_count,omitempty"`
 	// FollowCount 和 DiggCount 是标题旁显示的计数。
 	FollowCount int64 `json:"follow_count,omitempty"`
@@ -290,7 +290,7 @@ type Series struct {
 	SeasonIndex int `json:"season_index,omitempty"`
 	// RelatedAlbumID 是各季共用的合集 id。
 	RelatedAlbumID string `json:"related_album_id,omitempty"`
-	// RelatedNovelBookID 是剧集改编的小说（如已公开）。
+	// RelatedNovelBookID 是短剧改编的小说（如已公开）。
 	RelatedNovelBookID string `json:"related_novel_book_id,omitempty"`
 	// Novel 是详情页链接的原著小说（video_relate_book），服务端给出时才有。
 	Novel *Novel `json:"novel,omitempty"`
@@ -298,10 +298,10 @@ type Series struct {
 	Rows []InfoRow `json:"rows,omitempty"`
 }
 
-// Novel 是剧集改编自的小说。
+// Novel 是短剧改编自的小说。
 type Novel struct {
 	BookID string `json:"book_id"`
-	// Title 是小说本身的名称；ShortTitle 是它与剧集共用的名称。
+	// Title 是小说本身的名称；ShortTitle 是它与短剧共用的名称。
 	Title          string      `json:"title"`
 	ShortTitle     string      `json:"short_title,omitempty"`
 	Status         NovelStatus `json:"status"`
@@ -336,7 +336,7 @@ func (s NovelStatus) String() string {
 	return "unknown"
 }
 
-// SeriesDetail 是一部剧集及其分集，由批量读取返回。
+// SeriesDetail 是一部短剧及其分集，由批量读取返回。
 type SeriesDetail struct {
 	Series   *Series   `json:"series"`
 	Episodes []Episode `json:"episodes"`
@@ -397,7 +397,7 @@ type Suggestion struct {
 	Kind int `json:"kind,omitempty"`
 }
 
-// Recommend 是一部剧集的相关视频单元：包含各行、单元标题，
+// Recommend 是一部短剧的相关视频单元：包含各行、单元标题，
 // 以及客户端为后续请求保留的分页会话。
 type Recommend struct {
 	CellTitle string          `json:"cell_title,omitempty"`
@@ -470,7 +470,7 @@ type WorkPage struct {
 	Cursor  string `json:"cursor,omitempty"`
 }
 
-// Work 是某人出演的一部剧集。
+// Work 是某人出演的一部短剧。
 type Work struct {
 	SeriesID       string    `json:"series_id"`
 	Title          string    `json:"title"`
@@ -480,7 +480,7 @@ type Work struct {
 	EpisodeCount   int       `json:"episode_count,omitempty"`
 	// Tags 是卡片上的各行，例如 "爱情" 和 "70集"。
 	Tags []string `json:"tags,omitempty"`
-	// Heat 是剧集的原始热度分；Plays 是其播放量。
+	// Heat 是短剧的原始热度分；Plays 是其播放量。
 	Heat  int64 `json:"heat,omitempty"`
 	Plays int64 `json:"plays,omitempty"`
 }
@@ -623,7 +623,7 @@ type FilterRow struct {
 type ShortFilterPage struct {
 	Items   []SeriesSummary `json:"items"`
 	HasMore bool            `json:"has_more"`
-	// Cursor 用于续取列表；它携带已展示的剧集，服务端会跳过它们。
+	// Cursor 用于续取列表；它携带已展示的短剧，服务端会跳过它们。
 	Cursor string `json:"cursor,omitempty"`
 }
 

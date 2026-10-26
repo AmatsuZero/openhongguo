@@ -35,7 +35,7 @@ func (c *Client) Person(ctx context.Context, userID string) (*model.Person, erro
 	return person, nil
 }
 
-// PersonWorks 加载某人参演剧的一页（其主页上的作品 › 剧作）。
+// PersonWorks 加载一位演员参演的短剧，一次一页（主页上的作品 › 剧作）。
 // cursor 是上一页的 Cursor。
 func (c *Client) PersonWorks(ctx context.Context, userID, cursor string) (*model.WorkPage, error) {
 	if !validID(userID) {

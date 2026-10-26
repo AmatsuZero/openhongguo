@@ -11,7 +11,7 @@ import (
 	"github.com/beilunyang/openhongguo/sdk/model"
 )
 
-// Ranking 加载一个活动榜单页。
+// Ranking 加载一个活动榜单。
 //
 // activity_api 主机独立于 reading 主机，
 // 接受不带签名设备查询参数的普通 JSON POST。
@@ -40,7 +40,7 @@ func (c *Client) Ranking(ctx context.Context, activityID, rankListID string) (*m
 	return protocol.ParseRanking(raw)
 }
 
-// RankRows 加载书城榜单 cell 的一页（经典频道的榜单入口）。这些行是书，
+// RankRows 加载书城榜单的一页（经典频道的榜单入口）。这些行是书，
 // 不是短剧。请求要的是新的一批（change_type=1），
 // 所以每次调用返回的集合都不同
 // （2026-10-24 实测：调用三次，第 1 名三次都不同）。Rank 只是该行在本页的位置，
@@ -74,7 +74,7 @@ func (c *Client) RankRows(ctx context.Context, cellID string, offset int) (*mode
 	return ranking, nil
 }
 
-// RankGroups 列出经典书城 tab 的各个榜单频道。
+// RankGroups 列出书城榜单的类型（经典频道的各个榜单）。
 //
 // 该 tab 提供一个榜单 cell，其 rank_with_category_data 列出所有榜单；
 // 这些 id 就是 cell/change 调用所需的 rank_algo 值。
@@ -110,7 +110,7 @@ type ShortFilterQuery struct {
 	Cursor     string
 }
 
-// ShortFilterPanel 加载某个类型的短剧筛选页选择行。
+// ShortFilterPanel 加载短剧筛选面板的各个选择行。
 // 类型可为 short_play（真人剧）、comic_series（漫剧）、ai_series（AI剧），
 // 空表示全部。不同类型的行和选项各不相同。
 func (c *Client) ShortFilterPanel(ctx context.Context, genre string) ([]model.FilterRow, error) {
@@ -132,9 +132,9 @@ func (c *Client) ShortFilterPanel(ctx context.Context, genre string) ([]model.Fi
 	return res.Rows, nil
 }
 
-// ShortFilter 加载符合 q 的短剧的一页。
+// ShortFilter 按条件筛选短剧，一次一页。
 //
-// 该服务位于 DistributionOrigin。每页的 Cursor 都带有已展示过的剧；
+// 该服务位于 DistributionOrigin。每页的 Cursor 都带有已展示过的短剧；
 // 服务端会跳过它们，所以各页不会重复（2026-10-24 实测）。
 func (c *Client) ShortFilter(ctx context.Context, q ShortFilterQuery) (*model.ShortFilterPage, error) {
 	for key, values := range q.Selections {
@@ -249,12 +249,12 @@ type ShortRankQuery struct {
 	Cursor  string
 }
 
-// ShortRank 加载短剧榜单（排行榜）的一页。
+// ShortRank 加载短剧排行榜的一页，包括演员榜。
 //
 // 榜单页就是对某个书城 cell 调用 cell/change：
 // 每页还带有该页的内容目录及各内容的榜单。行按页面顺序给出，
 // RankItem.Position 就是这个顺序；Promoted 行是服务端插入的行（平台推荐）。
-// 每个 Cursor 都带有已展示过的剧，服务端会跳过它们（2026-10-24 实测）。
+// 每个 Cursor 都带有已展示过的短剧，服务端会跳过它们（2026-10-24 实测）。
 func (c *Client) ShortRank(ctx context.Context, q ShortRankQuery) (*model.ShortRanking, error) {
 	cur, err := protocol.DecodeShortCursor(q.Cursor)
 	if err != nil {
@@ -322,7 +322,7 @@ func (c *Client) ShortRank(ctx context.Context, q ShortRankQuery) (*model.ShortR
 	return out, err
 }
 
-// nextShortCursor 用一页的剧扩展 cur；到列表末尾时返回 ""。
+// nextShortCursor 用一页的短剧扩展 cur；到列表末尾时返回 ""。
 func nextShortCursor(cur protocol.ShortCursor, more bool, offset int, session string, ids []string) (string, error) {
 	if !more || len(ids) == 0 || offset <= cur.Offset {
 		return "", nil

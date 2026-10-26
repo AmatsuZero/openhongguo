@@ -123,8 +123,10 @@ func (d Drift) String() string {
 
 // Compare reports every fixture field whose path is missing from live or
 // never carries the fixture's type there. An empty array or object in the
-// fixture is satisfied by any value below that path. Fields only the live
-// response has are not drift: the parsers ignore them.
+// fixture is satisfied by any value below that path, and null satisfies a
+// string, number or bool: the parsers read it as the zero value, and which
+// optional fields are set depends on the title or person the run lands on.
+// Fields only the live response has are not drift: the parsers ignore them.
 func Compare(fixture, live []Field) []Drift {
 	liveTypes := map[string][]string{}
 	for _, f := range live {
@@ -134,6 +136,9 @@ func Compare(fixture, live []Field) []Drift {
 	for _, f := range fixture {
 		got := liveTypes[f.Path]
 		if contains(got, f.Type) {
+			continue
+		}
+		if isScalar(f.Type) && contains(got, "null") {
 			continue
 		}
 		if (f.Type == "array" || f.Type == "object") && hasPrefix(live, f.Path) {
@@ -151,6 +156,10 @@ func hasPrefix(fields []Field, path string) bool {
 		}
 	}
 	return false
+}
+
+func isScalar(typ string) bool {
+	return typ == "string" || typ == "number" || typ == "bool"
 }
 
 func contains(list []string, s string) bool {

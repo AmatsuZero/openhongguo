@@ -22,7 +22,7 @@
 //
 //   - 片库：[Client.Discover]、[Client.Search]、[Client.Suggest]、
 //     [Client.HotSearch]、[Client.SearchCues] 和 [Client.NewReleases]。
-//   - 剧集：[Client.GetSeries]、[Client.GetSeriesBatch]、
+//   - 短剧与分集：[Client.GetSeries]、[Client.GetSeriesBatch]、
 //     [Client.ListEpisodes]、[Client.Seasons] 和 [Client.SeriesRecommend]。
 //   - 榜单与筛选：[Client.ShortRank]、[Client.ShortFilterPanel]、
 //     [Client.ShortFilter]、[Client.Ranking]、[Client.RankRows] 和
@@ -30,7 +30,7 @@
 //   - 人物：[Client.Person] 和 [Client.PersonWorks]。
 //   - 书籍（小说和有声书，不是短剧）：[Client.Categories]
 //     和 [Client.CategoryLanding]。
-//   - 播放：[Client.ResolvePlayback]；加密剧集另用 [ContentKey]。
+//   - 播放：[Client.ResolvePlayback]；加密分集另用 [ContentKey]。
 //
 // 按游标分页的列表会在不同页里重复出现同一部作品。[Pager] 会跟随游标翻页，
 // 并去掉重复项。

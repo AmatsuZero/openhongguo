@@ -684,10 +684,10 @@ class NewReleasePage {
       };
 }
 
-/// Novel 是剧集改编自的小说。
+/// Novel 是短剧改编自的小说。
 class Novel {
   final String bookId;
-  /// Title 是小说本身的名称；ShortTitle 是它与剧集共用的名称。
+  /// Title 是小说本身的名称；ShortTitle 是它与短剧共用的名称。
   final String title;
   final String shortTitle;
   final NovelStatus status;
@@ -1207,7 +1207,7 @@ class Ranking {
       };
 }
 
-/// Recommend 是一部剧集的相关视频单元：包含各行、单元标题，
+/// Recommend 是一部短剧的相关视频单元：包含各行、单元标题，
 /// 以及客户端为后续请求保留的分页会话。
 class Recommend {
   final String cellTitle;
@@ -1275,7 +1275,7 @@ class Season {
       };
 }
 
-/// Series 是一部匿名剧集的详情视图。
+/// Series 是一部短剧的详情视图。
 class Series {
   final String id;
   final String title;
@@ -1297,7 +1297,7 @@ class Series {
   final PlatformType platform;
   /// Heat 是原始热度分；App 将其显示为 "红果热度值N万"。
   final int heat;
-  /// PlayCount 是剧集的总播放量（series_play_cnt）。
+  /// PlayCount 是短剧的总播放量（series_play_cnt）。
   final int playCount;
   /// FollowCount 和 DiggCount 是标题旁显示的计数。
   final int followCount;
@@ -1316,7 +1316,7 @@ class Series {
   final int seasonIndex;
   /// RelatedAlbumID 是各季共用的合集 id。
   final String relatedAlbumId;
-  /// RelatedNovelBookID 是剧集改编的小说（如已公开）。
+  /// RelatedNovelBookID 是短剧改编的小说（如已公开）。
   final String relatedNovelBookId;
   /// Novel 是详情页链接的原著小说（video_relate_book），服务端给出时才有。
   final Novel? novel;
@@ -1416,7 +1416,7 @@ class Series {
       };
 }
 
-/// SeriesDetail 是一部剧集及其分集，由批量读取返回。
+/// SeriesDetail 是一部短剧及其分集，由批量读取返回。
 class SeriesDetail {
   final Series? series;
   final List<Episode> episodes;
@@ -1439,7 +1439,7 @@ class SeriesDetail {
       };
 }
 
-/// SeriesStatus 是剧集的发布状态，由 data.video_data.series_status 携带。
+/// SeriesStatus 是短剧的发布状态，由 data.video_data.series_status 携带。
 ///
 /// 名称取自官方 App 的枚举 com.dragon.read.rpc.model.SeriesStatus（
 /// SeriesUpdating、SeriesEnd、SeriesUpdateTaday、SeriesUpdateStop）；
@@ -1449,9 +1449,9 @@ class SeriesStatus {
 
   const SeriesStatus(this.value);
 
-  /// SeriesUpdating 是未完结的剧集（"更新至 N 集"）。
+  /// SeriesUpdating 是未完结的短剧（"更新至 N 集"）。
   static const updating = SeriesStatus(0);
-  /// SeriesEnd 是已完结的剧集（"全 N 集"）。
+  /// SeriesEnd 是已完结的短剧（"全 N 集"）。
   static const end = SeriesStatus(1);
   /// SeriesUpdatedToday 是枚举中的“今日更新”状态（推断）。
   static const updatedToday = SeriesStatus(3);
@@ -1526,7 +1526,7 @@ class SeriesSummary {
 class ShortFilterPage {
   final List<SeriesSummary> items;
   final bool hasMore;
-  /// Cursor 用于续取列表；它携带已展示的剧集，服务端会跳过它们。
+  /// Cursor 用于续取列表；它携带已展示的短剧，服务端会跳过它们。
   final String cursor;
 
   const ShortFilterPage({
@@ -1700,7 +1700,7 @@ class Suggestion {
       };
 }
 
-/// Work 是某人出演的一部剧集。
+/// Work 是某人出演的一部短剧。
 class Work {
   final String seriesId;
   final String title;
@@ -1710,7 +1710,7 @@ class Work {
   final int episodeCount;
   /// Tags 是卡片上的各行，例如 "爱情" 和 "70集"。
   final List<String> tags;
-  /// Heat 是剧集的原始热度分；Plays 是其播放量。
+  /// Heat 是短剧的原始热度分；Plays 是其播放量。
   final int heat;
   final int plays;
 
