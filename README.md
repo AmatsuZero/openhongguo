@@ -405,6 +405,10 @@ SDK 还没有发布 1.0 版本。在 1.0 之前，次版本号可能包含不兼
 
 关于本项目的最终解释权归开发者所有。开发者保留随时更改或更新本免责声明的权利，恕不另行通知。
 
+## 友链
+
+感谢 [LINUXDO](https://linux.do/) 社区提供的帮助与支持。
+
 ## 许可证
 
 本项目使用 Apache License 2.0 许可证。全文见 [LICENSE](LICENSE)。Copyright 2026 beilunyang。
