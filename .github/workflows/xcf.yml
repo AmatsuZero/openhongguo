@@ -1,0 +1,97 @@
+name: xcf
+
+# Builds OpenhongguoCore.xcframework (with the macOS slice that a local
+# `swift build` needs) using gomobile, and publishes it to a GitHub Release
+# so the root Package.swift's binaryTarget can resolve. The upstream root
+# Package.swift pointed at a v0.1.0 release asset that was never published
+# (404); this workflow generates and hosts it instead.
+#
+# Triggers:
+#   - push of a tag like xcf-v0.1.1
+#   - manual workflow_dispatch (provide the tag name)
+on:
+  push:
+    tags: ['xcf-v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag for the xcframework (e.g. xcf-v0.1.1)"
+        required: true
+        default: "xcf-v0.1.1"
+
+permissions:
+  contents: write
+
+env:
+  # Keep in step with golang.org/x/mobile in bindings/mobile/core/go.mod.
+  GOMOBILE_VERSION: v0.0.0-20261011034528-197770444867
+
+jobs:
+  xcf:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: bindings/mobile/core/go.mod
+          cache-dependency-path: bindings/mobile/core/go.sum
+
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@$GOMOBILE_VERSION golang.org/x/mobile/cmd/gobind@$GOMOBILE_VERSION
+          gomobile init
+
+      - name: Build xcframework (iOS + macOS slices)
+        run: bindings/mobile/build.sh ios
+
+      - name: Validate the macOS slice loads
+        working-directory: bindings/mobile/ios
+        run: swift build
+
+      - name: Zip + checksum
+        id: pkg
+        run: |
+          cd bindings/mobile/build
+          zip -r OpenhongguoCore.xcframework.zip OpenhongguoCore.xcframework
+          CK=$(shasum -a 256 OpenhongguoCore.xcframework.zip | awk '{print $1}')
+          echo "checksum=$CK" >> "$GITHUB_OUTPUT"
+          echo "Built xcframework, sha256=$CK"
+
+      - name: Point root Package.swift at this release
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          CK="${{ steps.pkg.outputs.checksum }}"
+          python3 scripts/fix_xcf_binarytarget.py "$TAG" "$CK"
+
+      - name: Commit Package.swift to main
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+          git config user.email "ci@openhongguo.local"
+          git config user.name "openhongguo-ci"
+          git add Package.swift
+          git commit -m "ci: point binaryTarget at ${TAG} xcframework release" || echo "no change"
+          git push origin main
+
+      - name: Ensure release tag exists
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Publish xcframework release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: xcframework ${{ github.event.inputs.tag || github.ref_name }}
+          body: |
+            OpenhongguoCore.xcframework (iOS + macOS slices) built with gomobile.
+            Consumed by the root Package.swift binaryTarget.
+          files: bindings/mobile/build/OpenhongguoCore.xcframework.zip
+          make_latest: false
