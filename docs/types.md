@@ -601,7 +601,7 @@ DiscoverOptions 选择一个发现页。Channel 是书城频道名，空频道�
 |---|---|---|
 | `cursor` | string |  |
 | `channel` | string |  |
-| `pageSize` | number | cell/change limit |
+| `pageSize` | int |  |
 
 ### SearchOptions
 
