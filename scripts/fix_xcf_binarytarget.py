@@ -11,15 +11,23 @@ import sys
 TAG = sys.argv[1]
 CK = sys.argv[2]
 
-OLD_URL = "beilunyang/openhongguo/releases/download/v0.1.0/OpenhongguoCore.xcframework.zip"
-NEW_URL = "AmatsuZero/openhongguo/releases/download/%s/OpenhongguoCore.xcframework.zip" % TAG
+NEW_URL = "https://github.com/AmatsuZero/openhongguo/releases/download/%s/OpenhongguoCore.xcframework.zip" % TAG
 
 PATH = os.path.join(os.path.dirname(__file__), "..", "Package.swift")
 
 with open(PATH) as f:
     s = f.read()
 
-s = s.replace(OLD_URL, NEW_URL)
+s = re.sub(
+    r'url: "https://github\.com/AmatsuZero/openhongguo/releases/download/xcf-v[^"]+/OpenhongguoCore\.xcframework\.zip"',
+    'url: "%s"' % NEW_URL,
+    s,
+)
+s = re.sub(
+    r'url: "https://github\.com/beilunyang/openhongguo/releases/download/[^"]+/OpenhongguoCore\.xcframework\.zip"',
+    'url: "%s"' % NEW_URL,
+    s,
+)
 s = re.sub(r'checksum: "[0-9a-f]+"', 'checksum: "%s"' % CK, s)
 s = s.replace("beilunyang/openhongguo.git", "AmatsuZero/openhongguo.git")
 
