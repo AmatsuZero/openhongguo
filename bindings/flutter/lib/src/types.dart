@@ -1790,11 +1790,7 @@ class DiscoverOptions {
   const DiscoverOptions({this.cursor, this.channel, this.pageSize});
 
   DiscoverOptions copyWith({String? cursor, String? channel, int? pageSize}) =>
-      DiscoverOptions(
-        cursor: cursor ?? this.cursor,
-        channel: channel ?? this.channel,
-        pageSize: pageSize ?? this.pageSize,
-      );
+      DiscoverOptions(cursor: cursor ?? this.cursor, channel: channel ?? this.channel, pageSize: pageSize ?? this.pageSize);
 
   Map<String, dynamic> toJson() => {
         if (cursor != null) 'cursor': cursor!,
