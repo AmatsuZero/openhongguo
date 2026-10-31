@@ -357,10 +357,19 @@ type Transport interface {
 
 `ohg` 是用 SDK 写的命令行工具，演示了 SDK 的典型用法。
 
+| 安装方式 | 说明 |
+|---|---|
+| 下载二进制 | 从 [GitHub Releases](https://github.com/beilunyang/openhongguo/releases) 下载对应平台的压缩包，有 macOS、Linux 和 Windows 的 amd64 与 arm64 版本 |
+| `go install` | `go install github.com/beilunyang/openhongguo/cmd/ohg@latest` |
+| 从源码构建 | `go build -o bin/ohg ./cmd/ohg` |
+
+macOS 会拦截从浏览器下载的未签名程序。解压后执行一次 `xattr -d com.apple.quarantine ohg`，再运行。
+
+下载和解密分集需要 `ffmpeg`，播放需要 `mpv`、`ffplay` 或 VLC 等播放器。
+
 ```sh
-go build -o bin/ohg ./cmd/ohg
-bin/ohg search 全球死考
-bin/ohg play 全球死考第一季
+ohg search 全球死考
+ohg play 全球死考第一季
 ```
 
 播放需要 `mpv`、`ffplay` 或 `vlc`，下载需要 `ffmpeg`。完整用法见 [docs/cli.md](docs/cli.md)。
