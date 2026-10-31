@@ -1,4 +1,4 @@
-# Builds the ohg command-line demo for macOS, Linux and Windows and attaches
+# Builds openhongguo-cli, the ohg command, for macOS, Linux and Windows and attaches
 # the archives and their checksums to a GitHub Release. It runs when a
 # release is published, and by hand for a release that already exists.
 name: release
@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 jobs:
-  ohg:
+  cli:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -34,7 +34,7 @@ jobs:
           mkdir -p dist
           for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
             os=${target%/*} arch=${target#*/}
-            name="ohg_${TAG}_${os}_${arch}"
+            name="openhongguo-cli_${TAG}_${os}_${arch}"
             exe=ohg
             if [ "$os" = windows ]; then exe=ohg.exe; fi
             mkdir -p "build/$name"
@@ -46,7 +46,7 @@ jobs:
               tar -C build -czf "dist/$name.tar.gz" "$name"
             fi
           done
-          (cd dist && sha256sum ohg_* > "ohg_${TAG}_checksums.txt")
+          (cd dist && sha256sum openhongguo-cli_* > "openhongguo-cli_${TAG}_checksums.txt")
       - name: Upload
         env:
           GH_TOKEN: ${{ github.token }}

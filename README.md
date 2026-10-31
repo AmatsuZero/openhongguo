@@ -29,7 +29,7 @@ SDK 用匿名设备发送所有请求，不需要登录。Go 以外的 SDK 都�
 |---|---|
 | [类型参考](docs/types.md) | 所有返回值和查询参数的字段 |
 | [Go 包文档](https://pkg.go.dev/github.com/beilunyang/openhongguo/sdk) | Go SDK 的完整 API |
-| [命令行文档](docs/cli.md) | 演示程序 `ohg` 的用法 |
+| [命令行文档](docs/cli.md) | 命令行工具 openhongguo-cli（命令 `ohg`）的用法 |
 | [开发说明](docs/development.md) | 接口契约检查和持续集成 |
 | [发布手册](docs/release.md) | 发布新版本的步骤 |
 
@@ -273,7 +273,7 @@ async function resolvePlayback(client, episodeId) {
 }
 ```
 
-命令行演示 `ohg` 的 `play` 和 `download` 已经这样处理。
+命令行工具 openhongguo-cli 的 `ohg play` 和 `ohg download` 已经这样处理。
 
 ## 自定义 HTTP
 
@@ -355,11 +355,11 @@ type Transport interface {
 
 ## 命令行演示
 
-`ohg` 是用 SDK 写的命令行工具，演示了 SDK 的典型用法。
+openhongguo-cli 是用 SDK 写的命令行工具，命令名是 `ohg`。它演示了 SDK 的典型用法。
 
 | 安装方式 | 说明 |
 |---|---|
-| 下载二进制 | 从 [GitHub Releases](https://github.com/beilunyang/openhongguo/releases) 下载对应平台的压缩包，有 macOS、Linux 和 Windows 的 amd64 与 arm64 版本 |
+| 下载二进制 | 从 [GitHub Releases](https://github.com/beilunyang/openhongguo/releases) 下载对应平台的 `openhongguo-cli_*` 压缩包，有 macOS、Linux 和 Windows 的 amd64 与 arm64 版本 |
 | `go install` | `go install github.com/beilunyang/openhongguo/cmd/ohg@latest` |
 | 从源码构建 | `go build -o bin/ohg ./cmd/ohg` |
 
