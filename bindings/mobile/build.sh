@@ -35,7 +35,7 @@ core_android() {
 core_ios() {
 	[ -d "$out/OpenhongguoCore.xcframework" ] && return
 	mkdir -p "$out"
-	(cd "$core" && gomobile bind -target ios,iossimulator,macos -iosversion 13 \
+	(cd "$core" && gomobile bind -target ios,iossimulator,macos -iosversion 13 -macosversion "${MACOS_MIN_VERSION:-12.0}" \
 		-trimpath -ldflags="-s -w" -o "$out/OpenhongguoCore.xcframework" .)
 }
 

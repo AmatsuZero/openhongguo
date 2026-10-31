@@ -69,7 +69,7 @@ kotlinx-coroutines 会随依赖一起引入。最低系统版本是 Android 5.0�
 .package(url: "https://github.com/beilunyang/openhongguo.git", from: "0.1.1")
 ```
 
-Swift 包从 GitHub Release 下载 Go 编译出的 xcframework。最低系统版本是 iOS 13 和 macOS 11。
+Swift 包从 GitHub Release 下载 Go 编译出的 xcframework。最低系统版本是 iOS 13 和 macOS 12。
 
 ## 构建
 

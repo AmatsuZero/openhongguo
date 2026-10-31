@@ -25,6 +25,8 @@ permissions:
 env:
   # Keep in step with golang.org/x/mobile in bindings/mobile/core/go.mod.
   GOMOBILE_VERSION: v0.0.0-20261011034528-197770444867
+  # Go 1.26 supports macOS 12+, and the Swift package declares the same floor.
+  MACOS_MIN_VERSION: "12.0"
 
 jobs:
   xcf:
@@ -48,6 +50,37 @@ jobs:
       - name: Build xcframework (iOS + macOS slices)
         run: bindings/mobile/build.sh ios
 
+      - name: Validate macOS deployment target
+        working-directory: bindings/mobile/build
+        env:
+          EXPECTED_MACOS_MIN_VERSION: ${{ env.MACOS_MIN_VERSION }}
+        run: |
+          macos_binary="$(find OpenhongguoCore.xcframework -type f -path '*/macos-*/*' -name OpenhongguoCore -print -quit)"
+          test -n "$macos_binary"
+          lipo -verify_arch arm64 x86_64 "$macos_binary"
+          otool -l "$macos_binary" > "$RUNNER_TEMP/openhongguo-macos-otool.txt"
+          python3 - "$EXPECTED_MACOS_MIN_VERSION" "$RUNNER_TEMP/openhongguo-macos-otool.txt" <<'PY'
+          import pathlib
+          import sys
+
+          expected = sys.argv[1]
+          lines = pathlib.Path(sys.argv[2]).read_text().splitlines()
+          versions = []
+          for index, line in enumerate(lines):
+              if line.strip() != "platform 1":
+                  continue
+              for candidate in lines[index + 1:index + 5]:
+                  fields = candidate.split()
+                  if len(fields) == 2 and fields[0] == "minos":
+                      versions.append(fields[1])
+                      break
+          if not versions:
+              raise SystemExit("no macOS LC_BUILD_VERSION entries found")
+          if any(version != expected for version in versions):
+              raise SystemExit(f"unexpected macOS deployment targets: {versions}; expected {expected}")
+          print(f"validated {len(versions)} macOS Mach-O entries at minos {expected}")
+          PY
+
       - name: Validate the macOS slice loads
         working-directory: bindings/mobile/ios
         run: swift build
@@ -68,6 +101,8 @@ jobs:
           python3 scripts/fix_xcf_binarytarget.py "$TAG" "$CK"
 
       - name: Commit Package.swift to main
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           git fetch origin main
           git checkout -B main origin/main
