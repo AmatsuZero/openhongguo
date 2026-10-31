@@ -57,8 +57,13 @@ jobs:
         run: |
           macos_binary="$(find OpenhongguoCore.xcframework -type f -path '*/macos-*/*' -name OpenhongguoCore -print -quit)"
           test -n "$macos_binary"
-          lipo -verify_arch arm64 "$macos_binary"
-          lipo -verify_arch x86_64 "$macos_binary"
+          architectures="$(lipo -archs "$macos_binary")"
+          for arch in arm64 x86_64; do
+            case " $architectures " in
+              *" $arch "*) ;;
+              *) echo "missing macOS architecture: $arch ($architectures)"; exit 1 ;;
+            esac
+          done
           otool -l "$macos_binary" > "$RUNNER_TEMP/openhongguo-macos-otool.txt"
           python3 - "$EXPECTED_MACOS_MIN_VERSION" "$RUNNER_TEMP/openhongguo-macos-otool.txt" <<'PY'
           import pathlib
