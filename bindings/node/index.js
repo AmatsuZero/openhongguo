@@ -116,13 +116,20 @@ export function nodeTransport({ timeoutMs = 30_000 } = {}) {
     new Promise((resolve, reject) => {
       const url = new URL(req.url);
       const mod = url.protocol === 'http:' ? http : https;
+      const maxBody = Number.isSafeInteger(req.maxResponseBytes) && req.maxResponseBytes > 0
+        ? Math.min(req.maxResponseBytes, MAX_BODY)
+        : MAX_BODY;
       const r = mod.request(url, { method: req.method || 'GET', headers: req.headers, timeout: timeoutMs }, (res) => {
         const chunks = [];
         let size = 0;
         res.on('data', (c) => {
           size += c.length;
-          if (size > MAX_BODY) r.destroy(new Error('response body too large'));
-          else chunks.push(c);
+          if (size > maxBody) {
+            r.destroy();
+            reject(new Error('response body too large'));
+            return;
+          }
+          chunks.push(c);
         });
         res.on('error', reject);
         res.on('end', () => {
@@ -165,6 +172,7 @@ export async function createClient(options = {}) {
     apiOrigin,
     registerOrigin,
     distributionOrigin,
+    webOrigin,
     retryAttempts = 3,
     device,
   } = options;
@@ -173,7 +181,7 @@ export async function createClient(options = {}) {
     transport,
     profile: store,
     log,
-    options: JSON.stringify({ apiOrigin, registerOrigin, distributionOrigin, retryAttempts, device }),
+    options: JSON.stringify({ apiOrigin, registerOrigin, distributionOrigin, webOrigin, retryAttempts, device }),
   });
   if (res.error) throw new OpenhongguoError(res.error);
   return new Client(res.call);
@@ -217,6 +225,10 @@ export class Client {
   }
   getSeries(seriesId) {
     return this.#invoke('getSeries', seriesId);
+  }
+  /** 读取一部漫画的公开正文；章节和图片顺序与官网一致。 */
+  getComicReader(bookId) {
+    return this.#invoke('getComicReader', bookId);
   }
   getSeriesBatch(seriesIds) {
     return this.#invoke('getSeriesBatch', seriesIds);

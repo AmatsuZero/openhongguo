@@ -324,6 +324,12 @@ type Transport interface {
 | `SeriesRecommend` | `seriesRecommend(seriesId)` | 加载一部短剧的相关推荐 |
 | `GetAlbum` | `getAlbum(albumId)` | 加载一个合集（多季合集）及其各季 |
 
+### 漫画正文
+
+| Go | 其他语言 | 作用 |
+|---|---|---|
+| `GetComicReader` | `getComicReader(bookId)` | 加载官方 Web 页当前公开的漫画正文 |
+
 ### 榜单与分类
 
 | Go | 其他语言 | 作用 |

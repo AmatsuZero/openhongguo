@@ -124,6 +124,9 @@ class ClientOptions {
   /// 短剧筛选和活动榜接口的地址；默认与 App 一致。
   final String? distributionOrigin;
 
+  /// 漫画正文 Web loader 的地址；为空时使用官方地址。
+  final String? webOrigin;
+
   /// 可重试的失败最多尝试几次，默认 3；0 或 1 表示不重试。
   final int retryAttempts;
 
@@ -138,6 +141,7 @@ class ClientOptions {
     this.apiOrigin,
     this.registerOrigin,
     this.distributionOrigin,
+    this.webOrigin,
     this.retryAttempts = 3,
     this.device,
     this.log,
@@ -147,6 +151,7 @@ class ClientOptions {
         if (apiOrigin != null) 'apiOrigin': apiOrigin,
         if (registerOrigin != null) 'registerOrigin': registerOrigin,
         if (distributionOrigin != null) 'distributionOrigin': distributionOrigin,
+        if (webOrigin != null) 'webOrigin': webOrigin,
         'retryAttempts': retryAttempts,
         if (device != null) 'device': device!.toJson(),
       });
@@ -227,6 +232,10 @@ class OpenhongguoClient {
 
   /// 一部剧的详情。
   Future<Series> getSeries(String seriesId) async => Series.fromJson(_asMap(await _call('getSeries', [seriesId])));
+
+  /// 读取一部漫画的公开正文；章节和图片顺序与官网一致。
+  Future<ComicReader> getComicReader(String bookId) async =>
+      ComicReader.fromJson(_asMap(await _call('getComicReader', [bookId])));
 
   /// 一次读取多部剧及其各集，按请求顺序返回。
   Future<List<SeriesDetail>> getSeriesBatch(List<String> seriesIds) async =>

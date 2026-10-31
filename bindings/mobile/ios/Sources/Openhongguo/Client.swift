@@ -98,6 +98,8 @@ public struct ClientOptions: Sendable {
     public var registerOrigin: String?
     /// 短剧筛选和活动榜接口的地址；默认与 App 一致。
     public var distributionOrigin: String?
+    /// 漫画正文 Web loader 的地址；为空时使用官方地址。
+    public var webOrigin: String?
     /// 可重试的失败最多尝试几次，默认 3；0 或 1 表示不重试。
     public var retryAttempts: Int
     /// 新注册设备自称的机型；为空的字段取默认值（小米 14）。
@@ -106,19 +108,20 @@ public struct ClientOptions: Sendable {
     public var logger: (@Sendable (String) -> Void)?
 
     public init(
-        apiOrigin: String? = nil, registerOrigin: String? = nil, distributionOrigin: String? = nil,
+        apiOrigin: String? = nil, registerOrigin: String? = nil, distributionOrigin: String? = nil, webOrigin: String? = nil,
         retryAttempts: Int = 3, device: Device? = nil, logger: (@Sendable (String) -> Void)? = nil
     ) {
         self.apiOrigin = apiOrigin
         self.registerOrigin = registerOrigin
         self.distributionOrigin = distributionOrigin
+        self.webOrigin = webOrigin
         self.retryAttempts = retryAttempts
         self.device = device
         self.logger = logger
     }
 
     struct Config: Encodable {
-        var apiOrigin, registerOrigin, distributionOrigin: String?
+        var apiOrigin, registerOrigin, distributionOrigin, webOrigin: String?
         var retryAttempts: Int
         var device: Device?
     }
@@ -126,7 +129,7 @@ public struct ClientOptions: Sendable {
     func json() throws -> String {
         let cfg = Config(
             apiOrigin: apiOrigin, registerOrigin: registerOrigin, distributionOrigin: distributionOrigin,
-            retryAttempts: retryAttempts, device: device)
+            webOrigin: webOrigin, retryAttempts: retryAttempts, device: device)
         return String(decoding: try JSONEncoder().encode(cfg), as: UTF8.self)
     }
 }
@@ -267,6 +270,11 @@ public final class OpenhongguoClient: Sendable {
     /// 一部剧的详情。
     public func getSeries(_ seriesId: String) async throws -> Series {
         try await call("getSeries", seriesId)
+    }
+
+    /// 读取一部漫画的公开正文；章节和图片顺序与官网一致。
+    public func getComicReader(_ bookId: String) async throws -> ComicReader {
+        try await call("getComicReader", bookId)
     }
 
     /// 一次读取多部剧及其各集，按请求顺序返回。

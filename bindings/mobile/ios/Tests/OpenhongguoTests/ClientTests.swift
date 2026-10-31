@@ -106,6 +106,17 @@ final class EngineTests: XCTestCase {
         }
     }
 
+    func testComicReaderDispatchesBookID() async throws {
+        let engine = FakeEngine(reply: { method, args in
+            XCTAssertEqual(method, "getComicReader")
+            XCTAssertEqual(args, #"["book-1"]"#)
+            return #"{"result":{"book_id":"book-1","title":"漫画","chapters":[]}}"#
+        }, onCancel: {})
+        let reader = try await OpenhongguoClient(engine: engine).getComicReader("book-1")
+        XCTAssertEqual(reader.bookId, "book-1")
+        XCTAssertEqual(reader.title, "漫画")
+    }
+
     func testSearchAllFollowsCursorAndDropsDuplicates() async throws {
         let engine = FakeEngine(reply: { _, args in
             if args.contains(#""cursor":"p2""#) {

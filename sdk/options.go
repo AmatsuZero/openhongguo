@@ -35,6 +35,9 @@ type Options struct {
 	// 读取（短剧筛选和活动榜单），APIOrigin 的默认主机不提供这些接口。
 	// 为空时使用 App 自己的 API 主机。
 	DistributionOrigin string
+	// WebOrigin 承载官方 Web 漫画正文页；为空时使用 hongguoduanju.com。
+	// 该接口是公开页面，不使用匿名设备注册或账号凭据。
+	WebOrigin string
 	// Device 是新匿名档案注册时使用的手机，之后每次请求都出示它。
 	// 零值字段取 model.DefaultDevice（Android 14 上的 Xiaomi 14，
 	// 小米应用商店渠道）。档案会保留注册时的设备，

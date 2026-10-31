@@ -152,6 +152,7 @@ func (t jsTransport) Do(_ context.Context, req *sdk.Request) (*sdk.Response, err
 	js.CopyBytesToJS(body, req.Body)
 	v, err := await(t.fn.Invoke(map[string]any{
 		"method": req.Method, "url": req.URL, "headers": headers, "body": body,
+		"noRedirect": req.NoRedirect, "maxResponseBytes": req.MaxResponseBytes,
 	}))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", sdk.ErrTransport, err)
@@ -164,6 +165,9 @@ func (t jsTransport) Do(_ context.Context, req *sdk.Request) (*sdk.Response, err
 	if b := v.Get("body"); b.Type() == js.TypeObject {
 		resp.Body = make([]byte, b.Get("length").Int())
 		js.CopyBytesToGo(resp.Body, b)
+	}
+	if req.MaxResponseBytes > 0 && int64(len(resp.Body)) > req.MaxResponseBytes {
+		return nil, fmt.Errorf("%w: response exceeds %d bytes", sdk.ErrTransport, req.MaxResponseBytes)
 	}
 	return resp, nil
 }

@@ -99,6 +99,105 @@ class CategoryPage {
       };
 }
 
+/// ComicChapter 是一话公开漫画正文，Number 从 1 开始。
+class ComicChapter {
+  final String id;
+  final int number;
+  final List<ComicPage> pages;
+
+  const ComicChapter({
+    this.id = '',
+    this.number = 0,
+    this.pages = const [],
+  });
+
+  /// 从 Go SDK 输出的 JSON 解码；缺省的字段取零值。
+  factory ComicChapter.fromJson(Map<String, dynamic> j) => ComicChapter(
+        id: _asString(j['id']),
+        number: _asInt(j['number']),
+        pages: _asList(j['pages'], (e) => ComicPage.fromJson(_asMap(e))),
+      );
+
+  /// 编码成与 Go SDK 相同的 JSON。
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'number': number,
+        'pages': pages.map((e) => e.toJson()).toList(),
+      };
+}
+
+/// ComicPage 是一张漫画长图。URL 是官方网页返回的签名地址，调用方应按
+/// 自身的安全边界代理或短期使用，不应把它持久化为稳定地址。
+class ComicPage {
+  final String id;
+  final String url;
+  final int width;
+  final int height;
+
+  const ComicPage({
+    this.id = '',
+    this.url = '',
+    this.width = 0,
+    this.height = 0,
+  });
+
+  /// 从 Go SDK 输出的 JSON 解码；缺省的字段取零值。
+  factory ComicPage.fromJson(Map<String, dynamic> j) => ComicPage(
+        id: _asString(j['id']),
+        url: _asString(j['url']),
+        width: _asInt(j['width']),
+        height: _asInt(j['height']),
+      );
+
+  /// 编码成与 Go SDK 相同的 JSON。
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'url': url,
+        'width': width,
+        'height': height,
+      };
+}
+
+/// ComicReader 是官方 Web 漫画页公开的正文。它只包含当前网页返回的
+/// 可读章节；NextEpisodeID 只是网页给出的后续标识，不代表该章节可读。
+class ComicReader {
+  final String bookId;
+  final String title;
+  final int canReadEpisodeCnt;
+  final List<ComicChapter> chapters;
+  final String nextEpisodeId;
+  final String sourceUrl;
+
+  const ComicReader({
+    this.bookId = '',
+    this.title = '',
+    this.canReadEpisodeCnt = 0,
+    this.chapters = const [],
+    this.nextEpisodeId = '',
+    this.sourceUrl = '',
+  });
+
+  /// 从 Go SDK 输出的 JSON 解码；缺省的字段取零值。
+  factory ComicReader.fromJson(Map<String, dynamic> j) => ComicReader(
+        bookId: _asString(j['book_id']),
+        title: _asString(j['title']),
+        canReadEpisodeCnt: _asInt(j['can_read_episode_cnt']),
+        chapters: _asList(j['chapters'], (e) => ComicChapter.fromJson(_asMap(e))),
+        nextEpisodeId: _asString(j['next_episode_id']),
+        sourceUrl: _asString(j['source_url']),
+      );
+
+  /// 编码成与 Go SDK 相同的 JSON。
+  Map<String, dynamic> toJson() => {
+        'book_id': bookId,
+        'title': title,
+        'can_read_episode_cnt': canReadEpisodeCnt,
+        'chapters': chapters.map((e) => e.toJson()).toList(),
+        'next_episode_id': nextEpisodeId,
+        'source_url': sourceUrl,
+      };
+}
+
 /// ContentKey 是受保护播放模型的 CENC（cenc-aes-ctr）内容密钥，
 /// 由 sdk.ContentKey 还原。
 class ContentKey {

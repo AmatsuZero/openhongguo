@@ -9,6 +9,10 @@ type Request struct {
 	URL     string
 	Headers map[string]string
 	Body    []byte
+	// NoRedirect 禁止自动跟随重定向，公开 Web 读取使用它。
+	NoRedirect bool
+	// MaxResponseBytes 是原始响应体的大小上限；零值沿用 Transport 默认值。
+	MaxResponseBytes int64
 }
 
 // Response 是 Transport 收到的响应。Body 是原始载荷，可能经过 gzip 压缩，

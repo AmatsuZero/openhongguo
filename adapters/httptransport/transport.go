@@ -53,7 +53,13 @@ func (t *Transport) Do(ctx context.Context, req *sdk.Request) (*sdk.Response, er
 	for k, v := range req.Headers {
 		hreq.Header.Set(k, v)
 	}
-	resp, err := t.client.Do(hreq)
+	client := t.client
+	if req.NoRedirect {
+		copy := *client
+		copy.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		client = &copy
+	}
+	resp, err := client.Do(hreq)
 	if err != nil {
 		return nil, err
 	}
@@ -61,9 +67,16 @@ func (t *Transport) Do(ctx context.Context, req *sdk.Request) (*sdk.Response, er
 	if t.logger != nil {
 		t.logger.Printf("HTTP %s %s -> %d", method, protocol.RedactedURL(req.URL), resp.StatusCode)
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	limit := int64(8 << 20)
+	if req.MaxResponseBytes > 0 && req.MaxResponseBytes < limit {
+		limit = req.MaxResponseBytes
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return nil, err
+	}
+	if int64(len(body)) > limit {
+		return nil, fmt.Errorf("%w: response exceeds %d bytes", sdk.ErrTransport, limit)
 	}
 	headers := map[string]string{}
 	for k, values := range resp.Header {

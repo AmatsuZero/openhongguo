@@ -97,6 +97,102 @@ public struct CategoryPage: Codable, Hashable, Sendable {
     }
 }
 
+/// ComicChapter 是一话公开漫画正文，Number 从 1 开始。
+public struct ComicChapter: Codable, Hashable, Sendable {
+    public var id: String
+    public var number: Int
+    public var pages: [ComicPage]
+
+    public init(id: String = "", number: Int = 0, pages: [ComicPage] = []) {
+        self.id = id
+        self.number = number
+        self.pages = pages
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case number
+        case pages
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decodeIfPresent(String.self, forKey: .id) ?? ""
+        self.number = try c.decodeIfPresent(Int.self, forKey: .number) ?? 0
+        self.pages = try c.decodeIfPresent([ComicPage].self, forKey: .pages) ?? []
+    }
+}
+
+/// ComicPage 是一张漫画长图。URL 是官方网页返回的签名地址，调用方应按
+/// 自身的安全边界代理或短期使用，不应把它持久化为稳定地址。
+public struct ComicPage: Codable, Hashable, Sendable {
+    public var id: String
+    public var url: String
+    public var width: Int
+    public var height: Int
+
+    public init(id: String = "", url: String = "", width: Int = 0, height: Int = 0) {
+        self.id = id
+        self.url = url
+        self.width = width
+        self.height = height
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case url
+        case width
+        case height
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decodeIfPresent(String.self, forKey: .id) ?? ""
+        self.url = try c.decodeIfPresent(String.self, forKey: .url) ?? ""
+        self.width = try c.decodeIfPresent(Int.self, forKey: .width) ?? 0
+        self.height = try c.decodeIfPresent(Int.self, forKey: .height) ?? 0
+    }
+}
+
+/// ComicReader 是官方 Web 漫画页公开的正文。它只包含当前网页返回的
+/// 可读章节；NextEpisodeID 只是网页给出的后续标识，不代表该章节可读。
+public struct ComicReader: Codable, Hashable, Sendable {
+    public var bookId: String
+    public var title: String
+    public var canReadEpisodeCnt: Int
+    public var chapters: [ComicChapter]
+    public var nextEpisodeId: String
+    public var sourceUrl: String
+
+    public init(bookId: String = "", title: String = "", canReadEpisodeCnt: Int = 0, chapters: [ComicChapter] = [], nextEpisodeId: String = "", sourceUrl: String = "") {
+        self.bookId = bookId
+        self.title = title
+        self.canReadEpisodeCnt = canReadEpisodeCnt
+        self.chapters = chapters
+        self.nextEpisodeId = nextEpisodeId
+        self.sourceUrl = sourceUrl
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case bookId = "book_id"
+        case title
+        case canReadEpisodeCnt = "can_read_episode_cnt"
+        case chapters
+        case nextEpisodeId = "next_episode_id"
+        case sourceUrl = "source_url"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.bookId = try c.decodeIfPresent(String.self, forKey: .bookId) ?? ""
+        self.title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        self.canReadEpisodeCnt = try c.decodeIfPresent(Int.self, forKey: .canReadEpisodeCnt) ?? 0
+        self.chapters = try c.decodeIfPresent([ComicChapter].self, forKey: .chapters) ?? []
+        self.nextEpisodeId = try c.decodeIfPresent(String.self, forKey: .nextEpisodeId) ?? ""
+        self.sourceUrl = try c.decodeIfPresent(String.self, forKey: .sourceUrl) ?? ""
+    }
+}
+
 /// ContentKey 是受保护播放模型的 CENC（cenc-aes-ctr）内容密钥，
 /// 由 sdk.ContentKey 还原。
 public struct ContentKey: Codable, Hashable, Sendable {

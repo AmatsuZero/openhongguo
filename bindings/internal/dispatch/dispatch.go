@@ -21,6 +21,7 @@ type Config struct {
 	APIOrigin          string       `json:"apiOrigin"`
 	RegisterOrigin     string       `json:"registerOrigin"`
 	DistributionOrigin string       `json:"distributionOrigin"`
+	WebOrigin          string       `json:"webOrigin"`
 	RetryAttempts      int          `json:"retryAttempts"`
 	Device             model.Device `json:"device"`
 }
@@ -42,6 +43,7 @@ func (cfg Config) Apply(opts *sdk.Options) {
 	opts.APIOrigin = cfg.APIOrigin
 	opts.RegisterOrigin = cfg.RegisterOrigin
 	opts.DistributionOrigin = cfg.DistributionOrigin
+	opts.WebOrigin = cfg.WebOrigin
 	opts.RetryAttempts = cfg.RetryAttempts
 	opts.Device = cfg.Device
 }
@@ -88,7 +90,8 @@ var methods = map[string]method{
 		}
 		return c.NewReleases(ctx, q)
 	},
-	"getSeries": oneString(func(ctx context.Context, c *sdk.Client, id string) (any, error) { return c.GetSeries(ctx, id) }),
+	"getSeries":      oneString(func(ctx context.Context, c *sdk.Client, id string) (any, error) { return c.GetSeries(ctx, id) }),
+	"getComicReader": oneString(func(ctx context.Context, c *sdk.Client, id string) (any, error) { return c.GetComicReader(ctx, id) }),
 	"getSeriesBatch": func(ctx context.Context, c *sdk.Client, a []json.RawMessage) (any, error) {
 		var ids []string
 		if err := arg(a, 0, &ids); err != nil {

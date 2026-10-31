@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { createClient, memoryProfileStore, OpenhongguoError } from '../index.js';
+import { Client, createClient, memoryProfileStore, nodeTransport, OpenhongguoError } from '../index.js';
 
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'testdata', 'protocol');
 const routes = {
@@ -26,6 +26,15 @@ before(async () => {
   server = createServer((req, res) => {
     const path = new URL(req.url, 'http://x').pathname;
     hits.push(path);
+    if (path === '/comic/7111944514343799844') {
+      const content = JSON.stringify({ chapter_info_list: [{ item_id: 'chapter1', pic_list: [{
+        pic_url: 'https://p9-novel-sign.byteimg.com/novel-pic/one.png', width: 720, height: 1280,
+      }] }] });
+      const loader = { book_id: '7111944514343799844', title: 'Fixture Comic', can_read_episode_cnt: 1, content };
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(`<script>window._ROUTER_DATA = ${JSON.stringify({loaderData: {'comic_(id)/page': loader}})};</script>`);
+      return;
+    }
     if (path.startsWith('/limited/')) {
       res.writeHead(429).end();
       return;
@@ -46,6 +55,41 @@ after(() => server.close());
 
 const client = (profile, extra = {}) =>
   createClient({ profile, apiOrigin: origin, registerOrigin: origin, distributionOrigin: origin, retryAttempts: 1, ...extra });
+
+test('getComicReader sends the book ID as its only argument', async () => {
+  const calls = [];
+  const c = new Client(async (method, argsJson) => {
+    calls.push({ method, args: JSON.parse(argsJson) });
+    return JSON.stringify({ book_id: 'book-1', title: '漫画', chapters: [] });
+  });
+  const reader = await c.getComicReader('book-1');
+  assert.equal(reader.title, '漫画');
+  assert.deepEqual(calls, [{ method: 'getComicReader', args: ['book-1'] }]);
+});
+
+test('getComicReader reads public HTML through wasm without device registration', async () => {
+  const profile = memoryProfileStore();
+  const c = await client(profile, { webOrigin: origin });
+  const reader = await c.getComicReader('7111944514343799844');
+  assert.equal(reader.book_id, '7111944514343799844');
+  assert.equal(reader.chapters[0].pages[0].height, 1280);
+  assert.equal(reader.source_url, 'https://hongguoduanju.com/comic/7111944514343799844');
+  assert.equal(await profile.load(), null);
+});
+
+test('nodeTransport honors an SDK response size limit', async () => {
+  const oversized = createServer((_req, res) => res.end('too large'));
+  await new Promise((resolve) => oversized.listen(0, '127.0.0.1', resolve));
+  try {
+    const url = `http://127.0.0.1:${oversized.address().port}/`;
+    await assert.rejects(
+      nodeTransport()({ method: 'GET', url, headers: {}, body: new Uint8Array(), maxResponseBytes: 1 }),
+      /response body too large/,
+    );
+  } finally {
+    await new Promise((resolve, reject) => oversized.close((err) => (err ? reject(err) : resolve())));
+  }
+});
 
 test('搜索、剧集详情和分集', async () => {
   const profile = memoryProfileStore();

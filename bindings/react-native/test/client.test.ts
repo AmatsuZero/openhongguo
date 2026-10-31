@@ -34,10 +34,10 @@ function fakeNative(reply: Reply, createResult = '{"id":7}') {
 
 test('参数和设置原样传给原生模块，结果按 JSON 解码', async () => {
   const f = fakeNative(() => ({ items: [{ id: '1', title: '剧' }], cursor: 'c2', has_more: true }));
-  const c = await createClientWith(f.native, { apiOrigin: 'http://x', device: { model: 'Pixel' } });
+  const c = await createClientWith(f.native, { apiOrigin: 'http://x', webOrigin: 'http://comic', device: { model: 'Pixel' } });
   assert.deepEqual(f.created[0], {
     profilePath: '/data/openhongguo/anonymous.json',
-    config: { apiOrigin: 'http://x', retryAttempts: 3, device: { model: 'Pixel' } },
+    config: { apiOrigin: 'http://x', webOrigin: 'http://comic', retryAttempts: 3, device: { model: 'Pixel' } },
     log: false,
   });
 
@@ -45,6 +45,14 @@ test('参数和设置原样传给原生模块，结果按 JSON 解码', async ()
   assert.deepEqual(f.calls[0], { id: 7, method: 'search', args: ['短剧', { pageSize: 20 }] });
   assert.equal(page.items[0].title, '剧');
   assert.equal(page.has_more, true);
+});
+
+test('getComicReader sends the book ID as its only argument', async () => {
+  const f = fakeNative(() => ({ book_id: 'book-1', title: '漫画', chapters: [] }));
+  const c = await createClientWith(f.native);
+  const reader = await c.getComicReader('book-1');
+  assert.equal(reader.title, '漫画');
+  assert.deepEqual(f.calls[0], { id: 7, method: 'getComicReader', args: ['book-1'] });
 });
 
 test('错误带着错误码抛出', async () => {

@@ -44,6 +44,18 @@ class ClientTest {
     }
 
     @Test
+    fun getComicReaderEncodesBookID() = runBlocking {
+        val engine = FakeEngine { method, args ->
+            assertEquals("getComicReader", method)
+            assertEquals("[\"book-1\"]", args.toString())
+            ok(JSONObject().put("book_id", "book-1").put("title", "漫画").put("chapters", JSONArray()))
+        }
+        val reader = OpenhongguoClient(engine).getComicReader("book-1")
+        assertEquals("book-1", reader.bookId)
+        assertEquals("漫画", reader.title)
+    }
+
+    @Test
     fun missingAndNullFieldsBecomeZeroValues() = runBlocking {
         val engine = FakeEngine { _, _ ->
             ok(JSONObject().put("id", "1").put("subtitles", JSONObject.NULL).put("novel", JSONObject.NULL))

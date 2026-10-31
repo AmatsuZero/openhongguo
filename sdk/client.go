@@ -40,6 +40,7 @@ type Client struct {
 	apiOrigin      string
 	registerOrigin string
 	distOrigin     string
+	webOrigin      string
 	// device 是新档案注册时使用的设备（Options.Device）。
 	device model.Device
 	// retryAttempts 是单个请求最多执行的次数（1 表示不重试）。
@@ -75,6 +76,10 @@ func NewClient(opts Options) (*Client, error) {
 	if dist == "" {
 		dist = defaultDistributionOrigin
 	}
+	web := strings.TrimRight(opts.WebOrigin, "/")
+	if web == "" {
+		web = "https://hongguoduanju.com"
+	}
 	attempts := opts.RetryAttempts
 	if attempts <= 0 {
 		attempts = 1
@@ -88,7 +93,7 @@ func NewClient(opts Options) (*Client, error) {
 		transport:     opts.Transport, profileStore: opts.ProfileStore,
 		signer: opts.Signer, authProvider: opts.AuthProvider,
 		logger: opts.Logger, clock: opts.Clock,
-		apiOrigin: api, registerOrigin: reg, distOrigin: dist,
+		apiOrigin: api, registerOrigin: reg, distOrigin: dist, webOrigin: web,
 	}, nil
 }
 

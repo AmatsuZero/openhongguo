@@ -140,6 +140,12 @@ Swift 包从 GitHub Release 下载 Go 编译出的 xcframework。最低系统版
 | `seriesRecommend(seriesId)` | 加载一部短剧的相关推荐 |
 | `getAlbum(albumId)` | 加载一个合集（多季合集）及其各季 |
 
+### 漫画正文
+
+| 方法 | 作用 |
+|---|---|
+| `getComicReader(bookId)` | 加载官方 Web 页当前公开的漫画正文 |
+
 ### 榜单与分类
 
 | 方法 | 作用 |

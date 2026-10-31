@@ -35,11 +35,14 @@ void main() {
 
   test('参数和设置传给原生端，结果解码成类型', () async {
     final calls = fake((_, __) => {'items': [series('1')], 'cursor': 'c2', 'has_more': true});
-    final c = await OpenhongguoClient.create(const ClientOptions(apiOrigin: 'http://x', device: Device(model: 'Pixel')));
+    final c = await OpenhongguoClient.create(
+      const ClientOptions(apiOrigin: 'http://x', webOrigin: 'http://comic', device: Device(model: 'Pixel')),
+    );
     final create = calls.first.arguments as Map;
     final config = jsonDecode(create['config'] as String) as Map;
     expect(create['profilePath'], isNull);
     expect(config['apiOrigin'], 'http://x');
+    expect(config['webOrigin'], 'http://comic');
     expect((config['device'] as Map)['model'], 'Pixel');
 
     final page = await c.search('短剧', const SearchOptions(pageSize: 20, filters: [SearchFilter.shortPlay]));
@@ -54,6 +57,15 @@ void main() {
     expect(page.items.single.episodeCount, 80);
     expect(page.cursor, 'c2');
     expect(page.hasMore, isTrue);
+  });
+
+  test('getComicReader only forwards its book ID', () async {
+    final calls = fake((_, __) => {'book_id': 'book-1', 'title': '漫画', 'chapters': []});
+    final reader = await (await OpenhongguoClient.create()).getComicReader('book-1');
+    expect(reader.title, '漫画');
+    final call = calls.last.arguments as Map;
+    expect(call['method'], 'getComicReader');
+    expect(jsonDecode(call['args'] as String), ['book-1']);
   });
 
   test('缺省和 null 的字段取零值', () async {

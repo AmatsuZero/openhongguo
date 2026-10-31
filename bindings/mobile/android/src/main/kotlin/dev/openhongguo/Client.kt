@@ -43,6 +43,8 @@ data class ClientOptions(
     val registerOrigin: String? = null,
     /** 短剧筛选和活动榜接口的地址；默认与 App 一致。 */
     val distributionOrigin: String? = null,
+    /** 漫画正文 Web loader 的地址；为空时使用官方地址。 */
+    val webOrigin: String? = null,
     /** 可重试的失败最多尝试几次，默认 3；0 或 1 表示不重试。 */
     val retryAttempts: Int = 3,
     /** 新注册设备自称的机型；为空的字段取默认值（小米 14）。 */
@@ -54,6 +56,7 @@ data class ClientOptions(
         put("apiOrigin", apiOrigin)
         put("registerOrigin", registerOrigin)
         put("distributionOrigin", distributionOrigin)
+        put("webOrigin", webOrigin)
         put("retryAttempts", retryAttempts)
         put("device", device?.toJson())
     }
@@ -128,6 +131,9 @@ class OpenhongguoClient internal constructor(private val engine: Engine) {
 
     /** 一部剧的详情。 */
     suspend fun getSeries(seriesId: String): Series = Series.fromJson(call("getSeries", seriesId).asObject())
+
+    /** 读取一部漫画的公开正文；章节和图片顺序与官网一致。 */
+    suspend fun getComicReader(bookId: String): ComicReader = ComicReader.fromJson(call("getComicReader", bookId).asObject())
 
     /** 一次读取多部剧及其各集，按请求顺序返回。 */
     suspend fun getSeriesBatch(seriesIds: List<String>): List<SeriesDetail> =

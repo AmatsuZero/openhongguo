@@ -40,6 +40,40 @@ CategoryPage 是一个分类落地页及其筛选项。
 | `has_more` | `hasMore` | bool |  |
 | `next_offset` | `nextOffset` | int | NextOffset 是下一页的偏移量，即 LandingOptions.Cursor 的值。 |
 
+### ComicChapter
+
+ComicChapter 是一话公开漫画正文，Number 从 1 开始。
+
+| 字段 | 驼峰 | 类型 | 说明 |
+|---|---|---|---|
+| `id` | `id` | string |  |
+| `number` | `number` | int |  |
+| `pages` | `pages` | [ComicPage](#comicpage) 列表 |  |
+
+### ComicPage
+
+ComicPage 是一张漫画长图。URL 是官方网页返回的签名地址，调用方应按自身的安全边界代理或短期使用，不应把它持久化为稳定地址。
+
+| 字段 | 驼峰 | 类型 | 说明 |
+|---|---|---|---|
+| `id` | `id` | string |  |
+| `url` | `url` | string |  |
+| `width` | `width` | int |  |
+| `height` | `height` | int |  |
+
+### ComicReader
+
+ComicReader 是官方 Web 漫画页公开的正文。它只包含当前网页返回的可读章节；NextEpisodeID 只是网页给出的后续标识，不代表该章节可读。
+
+| 字段 | 驼峰 | 类型 | 说明 |
+|---|---|---|---|
+| `book_id` | `bookId` | string |  |
+| `title` | `title` | string |  |
+| `can_read_episode_cnt` | `canReadEpisodeCnt` | int |  |
+| `chapters` | `chapters` | [ComicChapter](#comicchapter) 列表 |  |
+| `next_episode_id` | `nextEpisodeId` | string |  |
+| `source_url` | `sourceUrl` | string |  |
+
 ### ContentKey
 
 ContentKey 是受保护播放模型的 CENC（cenc-aes-ctr）内容密钥，由 sdk.ContentKey 还原。

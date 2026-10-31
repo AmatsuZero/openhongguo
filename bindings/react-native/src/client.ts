@@ -3,6 +3,7 @@
 import type {
   Album,
   CategoryPage,
+  ComicReader,
   ContentKey,
   Device,
   DiscoverOptions,
@@ -114,6 +115,8 @@ export interface ClientOptions {
   registerOrigin?: string;
   /** 短剧筛选和活动榜接口的地址；默认与 App 一致。 */
   distributionOrigin?: string;
+  /** 漫画正文 Web loader 的地址；为空时使用官方地址。 */
+  webOrigin?: string;
   /** 可重试的失败最多尝试几次，默认 3；0 或 1 表示不重试。 */
   retryAttempts?: number;
   /** 新注册设备自称的机型；未填的字段取默认值（小米 14）。 */
@@ -131,8 +134,8 @@ export interface PlaybackResult {
 
 /** createClientWith 用给定的原生模块创建客户端。 */
 export async function createClientWith(native: Native, options: ClientOptions = {}): Promise<Client> {
-  const { profilePath, log, apiOrigin, registerOrigin, distributionOrigin, retryAttempts = 3, device } = options;
-  const config = JSON.stringify({ apiOrigin, registerOrigin, distributionOrigin, retryAttempts, device });
+  const { profilePath, log, apiOrigin, registerOrigin, distributionOrigin, webOrigin, retryAttempts = 3, device } = options;
+  const config = JSON.stringify({ apiOrigin, registerOrigin, distributionOrigin, webOrigin, retryAttempts, device });
   const res = JSON.parse(native.createClient(profilePath ?? native.defaultProfilePath(), config, !!log));
   if (res.error) throw new OpenhongguoError(res.error);
   const id: number = res.id;
@@ -190,6 +193,10 @@ export class Client {
   /** 一部剧的详情。 */
   getSeries(seriesId: string): Promise<Series> {
     return this.#invoke('getSeries', seriesId);
+  }
+  /** 读取一部漫画的公开正文；章节和图片顺序与官网一致。 */
+  getComicReader(bookId: string): Promise<ComicReader> {
+    return this.#invoke('getComicReader', bookId);
   }
   /** 一次读取多部剧及其各集，按请求顺序返回。 */
   async getSeriesBatch(seriesIds: string[]): Promise<SeriesDetail[]> {

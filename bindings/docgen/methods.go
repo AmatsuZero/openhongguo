@@ -17,6 +17,7 @@ type group struct {
 var groups = []group{
 	{"发现与搜索", []string{"Discover", "DiscoverPager", "Search", "SearchPager", "Suggest", "HotSearch", "SearchCues", "NewReleases"}},
 	{"短剧与分集", []string{"GetSeries", "GetSeriesBatch", "ListEpisodes", "Seasons", "SeriesRecommend", "GetAlbum"}},
+	{"漫画正文", []string{"GetComicReader"}},
 	{"榜单与分类", []string{"ShortRank", "ShortFilterPanel", "ShortFilter", "RankRows", "RankGroups", "Ranking", "Categories", "CategoryLanding"}},
 	{"演员", []string{"Person", "PersonWorks"}},
 	{"播放与设备", []string{"ResolvePlayback", "ContentKey", "ResetDevice"}},

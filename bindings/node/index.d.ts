@@ -1,6 +1,7 @@
 import type {
   Album,
   CategoryPage,
+  ComicReader,
   ContentKey,
   Device,
   DiscoverOptions,
@@ -82,6 +83,10 @@ export interface TransportRequest {
   url: string;
   headers: Record<string, string>;
   body: Uint8Array;
+  /** 禁止自动跟随重定向。 */
+  noRedirect?: boolean;
+  /** 原始响应体的最大字节数；0 或 undefined 使用 transport 默认值。 */
+  maxResponseBytes?: number;
 }
 
 /** TransportResponse 是收到的响应。body 是原始字节，不要自动解压。 */
@@ -122,6 +127,8 @@ export interface ClientOptions {
   registerOrigin?: string;
   /** 短剧筛选和活动榜接口的地址；默认与 App 一致。 */
   distributionOrigin?: string;
+  /** 漫画正文 Web loader 的地址；为空时使用官方地址。 */
+  webOrigin?: string;
   /** 可重试的失败最多尝试几次，默认 3；0 或 1 表示不重试。 */
   retryAttempts?: number;
   /** 新注册设备自称的机型；未填的字段取默认值（小米 14）。 */
@@ -154,6 +161,8 @@ export declare class Client {
   newReleases(query?: NewReleaseQuery): Promise<NewReleasePage>;
   /** 一部剧的详情。 */
   getSeries(seriesId: string): Promise<Series>;
+  /** 读取一部漫画的公开正文；章节和图片顺序与官网一致。 */
+  getComicReader(bookId: string): Promise<ComicReader>;
   /** 一次读取多部剧及其各集，按请求顺序返回。 */
   getSeriesBatch(seriesIds: string[]): Promise<SeriesDetail[]>;
   /** 一部剧的分集列表。 */
