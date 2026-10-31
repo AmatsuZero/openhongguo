@@ -29,7 +29,7 @@ SDK 用匿名设备发送所有请求，不需要登录。Go 以外的 SDK 都�
 |---|---|
 | [类型参考](docs/types.md) | 所有返回值和查询参数的字段 |
 | [Go 包文档](https://pkg.go.dev/github.com/beilunyang/openhongguo/sdk) | Go SDK 的完整 API |
-| [命令行文档](docs/cli.md) | 演示程序 `ohg` 的用法 |
+| [命令行文档](docs/cli.md) | 命令行工具 openhongguo-cli（命令 `ohg`）的用法 |
 | [开发说明](docs/development.md) | 接口契约检查和持续集成 |
 | [发布手册](docs/release.md) | 发布新版本的步骤 |
 
@@ -240,6 +240,41 @@ SDK 第一次请求时注册匿名设备，然后把设备档案交给 `ProfileS
 
 如果服务端拒绝匿名设备，请求返回 `ErrDeviceRejected`。这时调用 `ResetDevice`，然后重试。
 
+### 播放次数限制
+
+从 2026-10-29 起，服务端基本只给每台匿名设备返回一次播放模型。之后同一台设备的 `ResolvePlayback` 只得到空结果，返回 `ErrAnonymousLimited`。新设备的第一次请求也不一定成功。
+
+SDK 不自动更换设备。需要连续播放时，调用方在 `ResolvePlayback` 返回 `ErrAnonymousLimited` 后调用 `ResetDevice`，然后重试。重试一两次即可。目前观察到的限制只出现在播放接口：设备拿不到播放模型以后，搜索和分集等接口照常返回结果，所以其他接口不需要因为这个限制更换设备。
+
+注意，`ErrAnonymousLimited` 区分不了“被限制”和“结果本来为空”：任何接口返回空的响应体都报这个错误，`Discover`、`Search` 和 `ListEpisodes` 在列表为空时也报这个错误。
+
+```go
+pb, err := client.ResolvePlayback(ctx, episodeID, sdk.PlaybackOptions{})
+for i := 0; i < 2 && errors.Is(err, sdk.ErrAnonymousLimited); i++ {
+	if err = client.ResetDevice(ctx); err != nil {
+		break
+	}
+	pb, err = client.ResolvePlayback(ctx, episodeID, sdk.PlaybackOptions{})
+}
+```
+
+其他语言用错误码 `ANONYMOUS_LIMITED` 判断，方法是 `resetDevice()`：
+
+```js
+async function resolvePlayback(client, episodeId) {
+  for (let i = 0; ; i++) {
+    try {
+      return await client.resolvePlayback(episodeId);
+    } catch (e) {
+      if (e.code !== 'ANONYMOUS_LIMITED' || i >= 2) throw e;
+      await client.resetDevice();
+    }
+  }
+}
+```
+
+命令行工具 openhongguo-cli 的 `ohg play` 和 `ohg download` 已经这样处理。
+
 ## 自定义 HTTP
 
 实现 `sdk.Transport`，可以使用代理、记录请求或在测试中模拟服务端。
@@ -320,12 +355,21 @@ type Transport interface {
 
 ## 命令行演示
 
-`ohg` 是用 SDK 写的命令行工具，演示了 SDK 的典型用法。
+openhongguo-cli 是用 SDK 写的命令行工具，命令名是 `ohg`。它演示了 SDK 的典型用法。
+
+| 安装方式 | 说明 |
+|---|---|
+| 下载二进制 | 从 [GitHub Releases](https://github.com/beilunyang/openhongguo/releases) 下载对应平台的 `openhongguo-cli_*` 压缩包，有 macOS、Linux 和 Windows 的 amd64 与 arm64 版本 |
+| `go install` | `go install github.com/beilunyang/openhongguo/cmd/ohg@latest` |
+| 从源码构建 | `go build -o bin/ohg ./cmd/ohg` |
+
+macOS 会拦截从浏览器下载的未签名程序。解压后执行一次 `xattr -d com.apple.quarantine ohg`，再运行。
+
+下载和解密分集需要 `ffmpeg`，播放需要 `mpv`、`ffplay` 或 VLC 等播放器。
 
 ```sh
-go build -o bin/ohg ./cmd/ohg
-bin/ohg search 全球死考
-bin/ohg play 全球死考第一季
+ohg search 全球死考
+ohg play 全球死考第一季
 ```
 
 播放需要 `mpv`、`ffplay` 或 `vlc`，下载需要 `ffmpeg`。完整用法见 [docs/cli.md](docs/cli.md)。
@@ -404,6 +448,33 @@ SDK 还没有发布 1.0 版本。在 1.0 之前，次版本号可能包含不兼
 ### 7. 最终解释权
 
 关于本项目的最终解释权归开发者所有。开发者保留随时更改或更新本免责声明的权利，恕不另行通知。
+
+## 交流群
+
+<table>
+  <tr>
+    <td>
+      <img src="https://pic.otaku.ren/20250309/AQADAcQxGxQjaVZ-.jpg" width="360" />
+    </td>
+    <td>
+      <img src="https://pic.otaku.ren/20250309/AQADCMQxGxQjaVZ-.jpg" width="360" />
+    </td>
+  </tr>
+  <tr>
+    <td>
+      关注公众号，获取更多项目动态，以及 AI、区块链和独立开发资讯。
+    </td>
+    <td>
+      添加微信，备注「openhongguo」，拉你进微信交流群。
+    </td>
+  </tr>
+</table>
+
+也可以在社交平台上找到我：
+
+- X (Twitter)：[@0xdinglv](https://x.com/0xdinglv)
+- 小红书：[主页](https://xhslink.com/m/19FI1djnItu)
+- Telegram：[@beilunyang](https://t.me/beilunyang)
 
 ## 友链
 

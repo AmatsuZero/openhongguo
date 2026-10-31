@@ -77,6 +77,12 @@
    gh release create vX.Y.Z dist/vX.Y.Z/OpenhongguoCore.xcframework.zip --title vX.Y.Z --notes "…"
    ```
 
+   发布 Release 后，`release` workflow 自动构建 openhongguo-cli（命令 `ohg`）的 macOS、Linux 和 Windows 二进制，连同校验和文件上传到这个 Release。给已有的 Release 补上二进制：
+
+   ```sh
+   gh workflow run release.yml -f tag=vX.Y.Z
+   ```
+
 3. 发布到 Maven Central。`~/.gradle/gradle.properties` 中必须有 `mavenCentralUsername`、`mavenCentralPassword`、`signingInMemoryKey` 和 `signingInMemoryKeyPassword`：
 
    ```sh
