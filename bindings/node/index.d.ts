@@ -87,6 +87,8 @@ export interface TransportRequest {
   noRedirect?: boolean;
   /** 原始响应体的最大字节数；0 或 undefined 使用 transport 默认值。 */
   maxResponseBytes?: number;
+  /** SDK context 的取消信号；transport 应用它终止底层请求。 */
+  signal?: AbortSignal;
 }
 
 /** TransportResponse 是收到的响应。body 是原始字节，不要自动解压。 */

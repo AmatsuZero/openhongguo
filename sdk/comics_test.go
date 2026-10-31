@@ -149,6 +149,49 @@ func TestGetComicReaderRejectsMalformedPublicContent(t *testing.T) {
 	}
 }
 
+func TestGetComicReaderRejectsInvalidIDTypes(t *testing.T) {
+	invalid := map[string]any{
+		"object": map[string]any{"bad": true}, "array": []any{"bad"},
+		"true": true, "false": false, "fraction": 1.5,
+		"exponent": json.Number("1e3"), "negative": json.Number("-1"),
+	}
+	for _, field := range []string{"book_id", "item_id", "next_vid"} {
+		for kind, value := range invalid {
+			t.Run(field+"/"+kind, func(t *testing.T) {
+				loader := comicLoader()
+				if field == "item_id" {
+					chapter := comicChapter("chapter1")
+					chapter["item_id"] = value
+					loader["content"] = comicContent([]any{chapter})
+				} else {
+					loader[field] = value
+				}
+				r, err := comicClient(t, htmlHandler(comicHTML(loader))).GetComicReader(context.Background(), comicID)
+				if !errors.Is(err, sdk.ErrContentUnavailable) || r != nil {
+					t.Fatalf("accepted invalid %s: reader=%+v err=%v", field, r, err)
+				}
+			})
+		}
+	}
+}
+
+func TestGetComicReaderAcceptsStringAndIntegerIDsWithoutLoss(t *testing.T) {
+	loader := comicLoader()
+	loader["book_id"] = json.Number("7111944514343799844")
+	loader["next_vid"] = json.Number("9223372036854775807")
+	loader["content"] = comicContent([]any{map[string]any{
+		"item_id":  json.Number("9223372036854775806"),
+		"pic_list": comicChapter("chapter1")["pic_list"],
+	}})
+	r, err := comicClient(t, htmlHandler(comicHTML(loader))).GetComicReader(context.Background(), comicID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.BookID != comicID || r.NextEpisodeID != "9223372036854775807" || r.Chapters[0].ID != "9223372036854775806" {
+		t.Fatalf("IDs lost or coerced: %+v", r)
+	}
+}
+
 func TestGetComicReaderRejectsUnsafePages(t *testing.T) {
 	for _, address := range []string{
 		"http://p9-novel-sign.byteimg.com/novel-pic/a.png", "https://evil.example/a.png",

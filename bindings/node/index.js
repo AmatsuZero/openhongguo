@@ -119,7 +119,7 @@ export function nodeTransport({ timeoutMs = 30_000 } = {}) {
       const maxBody = Number.isSafeInteger(req.maxResponseBytes) && req.maxResponseBytes > 0
         ? Math.min(req.maxResponseBytes, MAX_BODY)
         : MAX_BODY;
-      const r = mod.request(url, { method: req.method || 'GET', headers: req.headers, timeout: timeoutMs }, (res) => {
+      const r = mod.request(url, { method: req.method || 'GET', headers: req.headers, timeout: timeoutMs, signal: req.signal }, (res) => {
         const chunks = [];
         let size = 0;
         res.on('data', (c) => {
@@ -147,6 +147,9 @@ export function nodeTransport({ timeoutMs = 30_000 } = {}) {
           resolve({ status: res.statusCode, headers, cookies, body: new Uint8Array(Buffer.concat(chunks)) });
         });
       });
+      const deadline = timeoutMs > 0 ? setTimeout(() => r.destroy(new Error('request timed out')), timeoutMs) : undefined;
+      deadline?.unref();
+      r.once('close', () => clearTimeout(deadline));
       r.on('timeout', () => r.destroy(new Error('request timed out')));
       r.on('error', reject);
       if (req.body && req.body.length > 0) r.write(Buffer.from(req.body));

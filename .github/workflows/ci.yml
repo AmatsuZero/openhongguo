@@ -52,6 +52,8 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - run: npm run build
+      - name: Test wasm context cancellation
+        run: GOOS=js GOARCH=wasm go test -exec="$(go env GOROOT)/lib/wasm/go_js_wasm_exec" ./wasm
       - run: npm test
       - run: npm pack --dry-run
 

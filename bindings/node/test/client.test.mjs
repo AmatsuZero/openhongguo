@@ -91,6 +91,50 @@ test('nodeTransport honors an SDK response size limit', async () => {
   }
 });
 
+test('nodeTransport times out a continuously streaming response', async () => {
+  const slow = createServer((req, res) => {
+    res.writeHead(200);
+    res.write('start');
+    const stream = setInterval(() => res.write(' '), 5);
+    const finish = setTimeout(() => res.end('end'), 200);
+    req.on('close', () => { clearInterval(stream); clearTimeout(finish); });
+  });
+  await new Promise((resolve) => slow.listen(0, '127.0.0.1', resolve));
+  try {
+    const url = `http://127.0.0.1:${slow.address().port}/`;
+    await assert.rejects(
+      nodeTransport({ timeoutMs: 50 })({ method: 'GET', url, headers: {}, body: new Uint8Array() }),
+      /request timed out/,
+    );
+  } finally {
+    await new Promise((resolve, reject) => slow.close((err) => (err ? reject(err) : resolve())));
+  }
+});
+
+test('nodeTransport aborts the underlying request with the SDK signal', async () => {
+  let closed;
+  const requestClosed = new Promise((resolve) => { closed = resolve; });
+  const slow = createServer((req, res) => {
+    res.writeHead(200);
+    res.write('start');
+    const finish = setTimeout(() => res.end('end'), 200);
+    req.on('close', () => { clearTimeout(finish); closed(); });
+  });
+  await new Promise((resolve) => slow.listen(0, '127.0.0.1', resolve));
+  try {
+    const controller = new AbortController();
+    const url = `http://127.0.0.1:${slow.address().port}/`;
+    const pending = nodeTransport()({ method: 'GET', url, headers: {}, body: new Uint8Array(), signal: controller.signal });
+    const abort = setTimeout(() => controller.abort(), 20);
+    try {
+      await assert.rejects(pending, (error) => error.name === 'AbortError');
+      await requestClosed;
+    } finally { clearTimeout(abort); }
+  } finally {
+    await new Promise((resolve, reject) => slow.close((err) => (err ? reject(err) : resolve())));
+  }
+});
+
 test('搜索、剧集详情和分集', async () => {
   const profile = memoryProfileStore();
   const c = await client(profile);

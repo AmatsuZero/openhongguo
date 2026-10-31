@@ -13,6 +13,34 @@ import (
 
 var comicRouterAssignment = regexp.MustCompile(`\b_ROUTER_DATA\s*=`)
 var comicImageHost = regexp.MustCompile(`^p[0-9]+-novel-sign\.byteimg\.com$`)
+var comicIntegerID = regexp.MustCompile(`^[0-9]+$`)
+
+// comicID preserves decimal IDs without floating-point conversion, but never
+// turns malformed JSON objects, arrays or booleans into chapter identifiers.
+type comicID string
+
+func (id *comicID) UnmarshalJSON(raw []byte) error {
+	raw = bytes.TrimSpace(raw)
+	if bytes.Equal(raw, []byte("null")) {
+		*id = ""
+		return nil
+	}
+	if len(raw) > 0 && raw[0] == '"' {
+		var value string
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return err
+		}
+		*id = comicID(strings.TrimSpace(value))
+		return nil
+	}
+	if !comicIntegerID.Match(raw) {
+		return fmt.Errorf("comic ID must be a string or unsigned decimal integer")
+	}
+	*id = comicID(raw)
+	return nil
+}
+
+func (id comicID) String() string { return string(id) }
 
 // ParseComicReader 只读取官方 Web 页内的 JSON，不执行脚本。
 // 公开数量为零时不返回图片；任何公开章节损坏都会显式失败。
@@ -28,10 +56,10 @@ func ParseComicReader(raw []byte) (*model.ComicReader, error) {
 		return nil, fmt.Errorf("invalid comic router data: %w", err)
 	}
 	var page struct {
-		BookID    flexString      `json:"book_id"`
+		BookID    comicID         `json:"book_id"`
 		Title     string          `json:"title"`
 		CanRead   *int            `json:"can_read_episode_cnt"`
-		NextID    flexString      `json:"next_vid"`
+		NextID    comicID         `json:"next_vid"`
 		Content   json.RawMessage `json:"content"`
 		IsSuccess *bool           `json:"isSuccess"`
 	}
@@ -58,7 +86,7 @@ func ParseComicReader(raw []byte) (*model.ComicReader, error) {
 	}
 	var content struct {
 		Chapters []struct {
-			ID       flexString `json:"item_id"`
+			ID       comicID `json:"item_id"`
 			Pictures []struct {
 				URL    string `json:"pic_url"`
 				Width  int    `json:"width"`

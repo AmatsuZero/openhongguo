@@ -140,20 +140,43 @@ func jsError(v js.Value) error {
 // jsTransport 把请求交给 JS 的 transport 回调发送。
 type jsTransport struct{ fn js.Value }
 
-func (t jsTransport) Do(_ context.Context, req *sdk.Request) (*sdk.Response, error) {
+func (t jsTransport) Do(ctx context.Context, req *sdk.Request) (*sdk.Response, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if t.fn.Type() != js.TypeFunction {
 		return nil, fmt.Errorf("%w: transport is not a function", sdk.ErrInvalidOptions)
 	}
+	controller := js.Global().Get("AbortController").New()
+	var rejectCancel js.Value
+	executor := js.FuncOf(func(_ js.Value, args []js.Value) any {
+		rejectCancel = args[1]
+		return nil
+	})
+	cancelled := js.Global().Get("Promise").New(executor)
+	executor.Release()
+	stop := context.AfterFunc(ctx, func() {
+		controller.Call("abort")
+		rejectCancel.Invoke(js.Global().Get("Error").New("request context canceled"))
+	})
+	defer stop()
 	headers := map[string]any{}
 	for k, v := range req.Headers {
 		headers[k] = v
 	}
 	body := js.Global().Get("Uint8Array").New(len(req.Body))
 	js.CopyBytesToJS(body, req.Body)
-	v, err := await(t.fn.Invoke(map[string]any{
+	pending := t.fn.Invoke(map[string]any{
 		"method": req.Method, "url": req.URL, "headers": headers, "body": body,
 		"noRedirect": req.NoRedirect, "maxResponseBytes": req.MaxResponseBytes,
-	}))
+		"signal": controller.Get("signal"),
+	})
+	// Race native JS promises so an uncooperative custom transport cannot keep
+	// Go callbacks alive after cancellation; late settlement remains safe.
+	v, err := await(js.Global().Get("Promise").Call("race", js.ValueOf([]any{pending, cancelled})))
+	if contextErr := ctx.Err(); contextErr != nil {
+		return nil, contextErr
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", sdk.ErrTransport, err)
 	}
