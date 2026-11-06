@@ -67,13 +67,13 @@ func (c *Client) Discover(ctx context.Context, opts DiscoverOptions) (*Page[mode
 			if err != nil {
 				return nil, err
 			}
-		if next.TabType != strconvTab(channel.ResponseTab) {
-			return nil, fmt.Errorf("discover cursor is not verified")
-		}
-		if next.Limit <= 0 {
-			next.Limit = protocol.CellChangeLimit(opts.PageSize)
-		}
-		more, err := c.cellChange(ctx, p, id, next)
+			if next.TabType != strconvTab(channel.ResponseTab) {
+				return nil, fmt.Errorf("discover cursor is not verified")
+			}
+			if next.Limit <= 0 {
+				next.Limit = protocol.CellChangeLimit(opts.PageSize)
+			}
+			more, err := c.cellChange(ctx, p, id, next)
 			if err != nil {
 				return nil, err
 			}
@@ -92,10 +92,10 @@ func (c *Client) Discover(ctx context.Context, opts DiscoverOptions) (*Page[mode
 		if err != nil {
 			return nil, err
 		}
-	if next, ok := protocol.DiscoverContinuationTab(raw, channel.ResponseTab); ok {
-		next.Offset = "0"
-		next.Limit = protocol.CellChangeLimit(opts.PageSize)
-		more, err := c.cellChange(ctx, p, id, next)
+		if next, ok := protocol.DiscoverContinuationTab(raw, channel.ResponseTab); ok {
+			next.Offset = "0"
+			next.Limit = protocol.CellChangeLimit(opts.PageSize)
+			more, err := c.cellChange(ctx, p, id, next)
 			if err != nil {
 				return nil, err
 			}
