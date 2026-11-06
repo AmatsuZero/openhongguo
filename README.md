@@ -5,7 +5,7 @@
 [![npm react-native](https://img.shields.io/npm/v/react-native-openhongguo?label=npm%20react-native)](https://www.npmjs.com/package/react-native-openhongguo)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.beilunyang/openhongguo)](https://central.sonatype.com/artifact/io.github.beilunyang/openhongguo)
 [![pub.dev](https://img.shields.io/pub/v/openhongguo)](https://pub.dev/packages/openhongguo)
-[![CI](https://github.com/beilunyang/openhongguo/actions/workflows/ci.yml/badge.svg)](https://github.com/beilunyang/openhongguo/actions/workflows/ci.yml)
+[![CI](https://github.com/AmatsuZero/openhongguo/actions/workflows/ci.yml/badge.svg)](https://github.com/AmatsuZero/openhongguo/actions/workflows/ci.yml)
 
 openhongguo 是红果短剧（Hongguo）的非官方 SDK，提供 Go、Node.js、Android、iOS、React Native 和 Flutter 版本。SDK 可以浏览短剧目录、搜索短剧、读取短剧和分集的详情，并取得分集的播放地址和内容密钥。
 
@@ -383,7 +383,7 @@ openhongguo-cli 是用 SDK 写的命令行工具，命令名是 `ohg`。它演�
 
 | 安装方式 | 说明 |
 |---|---|
-| 下载二进制 | 从 [GitHub Releases](https://github.com/beilunyang/openhongguo/releases) 下载对应平台的 `openhongguo-cli_*` 压缩包，有 macOS、Linux 和 Windows 的 amd64 与 arm64 版本 |
+| 下载二进制 | 从 [GitHub Releases](https://github.com/AmatsuZero/openhongguo/releases) 下载对应平台的 `openhongguo-cli_*` 压缩包，有 macOS、Linux 和 Windows 的 amd64 与 arm64 版本 |
 | `go install` | `go install github.com/beilunyang/openhongguo/cmd/ohg@latest` |
 | 从源码构建 | `go build -o bin/ohg ./cmd/ohg` |
 
