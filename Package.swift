@@ -16,8 +16,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "OpenhongguoCore",
-            url: "https://github.com/AmatsuZero/openhongguo/releases/download/xcf-v0.1.1.8/OpenhongguoCore.xcframework.zip",
-            checksum: "63e6147a86aeb5b56b40f00f8fb0f5bd70256c9b3b883d586bab6381d9dc4805"
+            url: "https://github.com/AmatsuZero/openhongguo/releases/download/xcf-v0.1.1.9/OpenhongguoCore.xcframework.zip",
+            checksum: "79bb27c6a35be6f38e9e37a187b06efcee379573805a26b1769bfd664ff03003"
         ),
         .target(
             name: "Openhongguo",
