@@ -45,6 +45,10 @@ type Client struct {
 	device model.Device
 	// retryAttempts 是单个请求最多执行的次数（1 表示不重试）。
 	retryAttempts int
+	// deviceResets 是一次调用最多换几台新匿名设备（0 表示关闭）。
+	deviceResets int
+	// resetter 记录当前设备是第几代，让并发调用只换一台新设备。
+	resetter deviceResetter
 }
 
 // NewClient 根据 opts 创建客户端。Transport 和 ProfileStore 必填；
@@ -84,12 +88,17 @@ func NewClient(opts Options) (*Client, error) {
 	if attempts <= 0 {
 		attempts = 1
 	}
+	resets := defaultDeviceResets
+	if opts.DeviceResets != nil {
+		resets = max(*opts.DeviceResets, 0)
+	}
 	if err := opts.Device.Validate(); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidOptions, err)
 	}
 	return &Client{
 		device:        opts.Device.OrDefault(),
 		retryAttempts: attempts,
+		deviceResets:  resets,
 		transport:     opts.Transport, profileStore: opts.ProfileStore,
 		signer: opts.Signer, authProvider: opts.AuthProvider,
 		logger: opts.Logger, clock: opts.Clock,
@@ -411,19 +420,6 @@ func randInt64() (int64, error) {
 	}
 	v := int64(binary.BigEndian.Uint64(b[:]) & 0x7fffffffffffffff)
 	return v, nil
-}
-
-// ResetDevice 丢弃当前匿名设备，并注册一台新设备。请求报告
-// ErrDeviceRejected（BaseResp 263175 或 263176）时，调用方使用它。
-func (c *Client) ResetDevice(ctx context.Context) error {
-	if c.profileStore == nil {
-		return ErrInvalidOptions
-	}
-	if err := c.profileStore.Reset(ctx); err != nil {
-		return err
-	}
-	_, err := c.ensureGuest(ctx)
-	return err
 }
 
 // identity 返回 p 的设备查询身份：注册所得的 id 和注册时使用的设备。

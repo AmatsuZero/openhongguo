@@ -102,6 +102,8 @@ public struct ClientOptions: Sendable {
     public var webOrigin: String?
     /// 可重试的失败最多尝试几次，默认 3；0 或 1 表示不重试。
     public var retryAttempts: Int
+    /// 设备被拒或播放返回空结果时，一次调用最多换几台新的匿名设备，默认 2；0 表示关闭。
+    public var deviceResets: Int
     /// 新注册设备自称的机型；为空的字段取默认值（小米 14）。
     public var device: Device?
     /// 接收诊断日志，在 SDK 的线程里调用；日志里的 URL 已经脱敏。
@@ -109,13 +111,14 @@ public struct ClientOptions: Sendable {
 
     public init(
         apiOrigin: String? = nil, registerOrigin: String? = nil, distributionOrigin: String? = nil, webOrigin: String? = nil,
-        retryAttempts: Int = 3, device: Device? = nil, logger: (@Sendable (String) -> Void)? = nil
+        retryAttempts: Int = 3, deviceResets: Int = 2, device: Device? = nil, logger: (@Sendable (String) -> Void)? = nil
     ) {
         self.apiOrigin = apiOrigin
         self.registerOrigin = registerOrigin
         self.distributionOrigin = distributionOrigin
         self.webOrigin = webOrigin
         self.retryAttempts = retryAttempts
+        self.deviceResets = deviceResets
         self.device = device
         self.logger = logger
     }
@@ -123,13 +126,14 @@ public struct ClientOptions: Sendable {
     struct Config: Encodable {
         var apiOrigin, registerOrigin, distributionOrigin, webOrigin: String?
         var retryAttempts: Int
+        var deviceResets: Int
         var device: Device?
     }
 
     func json() throws -> String {
         let cfg = Config(
             apiOrigin: apiOrigin, registerOrigin: registerOrigin, distributionOrigin: distributionOrigin,
-            webOrigin: webOrigin, retryAttempts: retryAttempts, device: device)
+            webOrigin: webOrigin, retryAttempts: retryAttempts, deviceResets: deviceResets, device: device)
         return String(decoding: try JSONEncoder().encode(cfg), as: UTF8.self)
     }
 }
