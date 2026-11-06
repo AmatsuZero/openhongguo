@@ -40,7 +40,7 @@ SDK 用匿名设备发送所有请求，不需要登录。Go 以外的 SDK 都�
 | Go | [`github.com/beilunyang/openhongguo`](https://pkg.go.dev/github.com/beilunyang/openhongguo/sdk) | `go get github.com/beilunyang/openhongguo@latest` | 本文 |
 | Node.js | [`openhongguo`](https://www.npmjs.com/package/openhongguo) | `npm install openhongguo` | [bindings/node](bindings/node/README.md) |
 | Android（Kotlin） | [`io.github.beilunyang:openhongguo`](https://central.sonatype.com/artifact/io.github.beilunyang/openhongguo) | `implementation("io.github.beilunyang:openhongguo:0.1.0")` | [bindings/mobile](bindings/mobile/README.md) |
-| iOS / macOS（Swift） | Swift Package | `.package(url: "https://github.com/beilunyang/openhongguo.git", from: "0.1.1")` | [bindings/mobile](bindings/mobile/README.md) |
+| iOS / macOS（Swift） | Swift Package | `.package(url: "https://github.com/AmatsuZero/openhongguo.git", from: "0.1.2")` | [bindings/mobile](bindings/mobile/README.md) |
 | React Native | [`react-native-openhongguo`](https://www.npmjs.com/package/react-native-openhongguo) | `npx expo install react-native-openhongguo` | [bindings/react-native](bindings/react-native/README.md) |
 | Flutter | [`openhongguo`](https://pub.dev/packages/openhongguo) | `flutter pub add openhongguo` | [bindings/flutter](bindings/flutter/README.md) |
 
@@ -125,6 +125,7 @@ client, err := adapters.NewClient("anonymous.json", sdk.Options{
 | `ProfileStore` | 保存设备档案 | `filestore.New(profilePath)` |
 | `Device` | 新匿名设备的机型。空字段使用默认值 | 小米 14 |
 | `RetryAttempts` | 可重试的失败的最多尝试次数 | 1，即不重试（其他语言的 SDK 默认是 3） |
+| `DeviceResets` | 设备被拒（`ErrDeviceRejected`）或播放返回空结果（`ErrAnonymousLimited`）时，一次调用最多更换几台匿名设备 | 2（其他语言的 SDK 用 `deviceResets`，含义相同；0 表示关闭） |
 | `Logger` | 接收诊断日志 | 不记录 |
 | `APIOrigin`、`RegisterOrigin`、`DistributionOrigin` | 接口地址 | 与 App 相同 |
 
@@ -240,13 +241,30 @@ SDK 第一次请求时注册匿名设备，然后把设备档案交给 `ProfileS
 
 如果服务端拒绝匿名设备，请求返回 `ErrDeviceRejected`。这时调用 `ResetDevice`，然后重试。
 
-### 播放次数限制
+### 自动更换设备
 
 从 2026-10-29 起，服务端基本只给每台匿名设备返回一次播放模型。之后同一台设备的 `ResolvePlayback` 只得到空结果，返回 `ErrAnonymousLimited`。新设备的第一次请求也不一定成功。
 
-SDK 不自动更换设备。需要连续播放时，调用方在 `ResolvePlayback` 返回 `ErrAnonymousLimited` 后调用 `ResetDevice`，然后重试。重试一两次即可。目前观察到的限制只出现在播放接口：设备拿不到播放模型以后，搜索和分集等接口照常返回结果，所以其他接口不需要因为这个限制更换设备。
+SDK 默认自动处理两种情况：
 
-注意，`ErrAnonymousLimited` 区分不了“被限制”和“结果本来为空”：任何接口返回空的响应体都报这个错误，`Discover`、`Search` 和 `ListEpisodes` 在列表为空时也报这个错误。
+- 任何接口返回 `ErrDeviceRejected`，即服务端拒绝了当前的匿名设备。
+- `ResolvePlayback` 返回 `ErrAnonymousLimited`。
+
+遇到这两种情况，SDK 丢弃当前设备，注册一台新设备，然后重新执行这次调用。`Options.DeviceResets` 设置一次调用最多更换几台设备，默认 2 台，0 表示关闭。它是 `*int`，不填表示默认值；设置时用 `sdk.Int(n)`。其他语言的 SDK 用 `deviceResets` 选项，含义相同。
+
+```go
+// 关闭自动更换，自己调用 ResetDevice
+client, err := adapters.NewClient("anonymous.json", sdk.Options{
+	DeviceResets: sdk.Int(0),
+})
+```
+
+```swift
+// 关闭自动更换，自己调用 resetDevice()
+let client = try OpenhongguoClient.create(options: ClientOptions(deviceResets: 0))
+```
+
+保留默认（不设置 `deviceResets`）时通常不需要再手动处理。需要完全自己控制时，仍可在 `resolvePlayback` 返回 `ANONYMOUS_LIMITED` 后调用 `resetDevice()` 重试：
 
 ```go
 pb, err := client.ResolvePlayback(ctx, episodeID, sdk.PlaybackOptions{})
@@ -258,7 +276,7 @@ for i := 0; i < 2 && errors.Is(err, sdk.ErrAnonymousLimited); i++ {
 }
 ```
 
-其他语言用错误码 `ANONYMOUS_LIMITED` 判断，方法是 `resetDevice()`：
+注意，`ErrAnonymousLimited` 区分不了“被限制”和“结果本来为空”：任何接口返回空的响应体都报这个错误，`Discover`、`Search` 和 `ListEpisodes` 在列表为空时也报这个错误。其他语言用错误码 `ANONYMOUS_LIMITED` 判断。
 
 ```js
 async function resolvePlayback(client, episodeId) {
