@@ -16,6 +16,7 @@ const routes = {
   '/reading/bookapi/search/tab/v': 'search-response.json',
   '/novel/player/video_detail/v1/': 'series-response.json',
   '/novel/player/video_model/v1/': 'drm-playback.json',
+  '/novel/commentapi/comment/list/7100000000000201/v1/': 'danmaku-response.json',
 };
 
 let server;
@@ -182,4 +183,15 @@ test('请求发送失败映射成 TRANSPORT', async () => {
 
 test('无效的机型设置在创建时报 INVALID_OPTIONS', async () => {
   await assert.rejects(client(memoryProfileStore(), { device: { model: 'x; evil' } }), (e) => e.code === 'INVALID_OPTIONS');
+});
+
+test('一集的弹幕按出现时间排好，带着下一页的游标', async () => {
+  const c = await client(memoryProfileStore());
+  const page = await c.listDanmaku('7100000000000101', '7100000000000201');
+  assert.deepEqual(page.items.map((d) => [d.offset_ms, d.text]), [
+    [329, 'Fixture danmaku one'],
+    [12500, 'Fixture danmaku two'],
+  ]);
+  assert.equal(page.has_more, true);
+  assert.ok(page.cursor);
 });

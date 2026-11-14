@@ -55,6 +55,15 @@ test('getComicReader sends the book ID as its only argument', async () => {
   assert.deepEqual(f.calls[0], { id: 7, method: 'getComicReader', args: ['book-1'] });
 });
 
+test('listDanmaku 传剧、集和选项', async () => {
+  const f = fakeNative(() => ({ items: [{ id: '1', text: '好看', offset_ms: 1200 }], start_ms: 0, has_more: false }));
+  const c = await createClientWith(f.native);
+  const page = await c.listDanmaku('1001', '2001', { cursor: 'm1.x' });
+  assert.deepEqual(f.calls[0].args, ['1001', '2001', { cursor: 'm1.x' }]);
+  assert.equal(f.calls[0].method, 'listDanmaku');
+  assert.equal(page.items[0].offset_ms, 1200);
+});
+
 test('错误带着错误码抛出', async () => {
   const f = fakeNative(() => new OpenhongguoError({ code: 'RATE_LIMITED', message: 'slow', retryable: true, retryAfterMs: 1500 }));
   const c = await createClientWith(f.native);

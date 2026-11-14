@@ -338,6 +338,7 @@ type Transport interface {
 | `GetSeries` | `getSeries(seriesId)` | 加载一部短剧的详情 |
 | `GetSeriesBatch` | `getSeriesBatch(seriesIds)` | 加载多部短剧及其分集，按请求顺序返回 |
 | `ListEpisodes` | `listEpisodes(seriesId, options)` | 加载一部短剧的分集列表 |
+| `ListDanmaku` | `listDanmaku(seriesId, episodeId, options)` | 加载一集的弹幕，一次一页 |
 | `Seasons` | `seasons(seriesId)` | 列出多季短剧的全部季 |
 | `SeriesRecommend` | `seriesRecommend(seriesId)` | 加载一部短剧的相关推荐 |
 | `GetAlbum` | `getAlbum(albumId)` | 加载一个合集（多季合集）及其各季 |

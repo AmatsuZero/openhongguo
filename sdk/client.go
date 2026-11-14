@@ -49,6 +49,8 @@ type Client struct {
 	deviceResets int
 	// resetter 记录当前设备是第几代，让并发调用只换一台新设备。
 	resetter deviceResetter
+	// durations 记住各集的时长，供 ListDanmaku 使用。
+	durations durationCache
 }
 
 // NewClient 根据 opts 创建客户端。Transport 和 ProfileStore 必填；
