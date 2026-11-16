@@ -56,17 +56,42 @@ Task 0 骨架/Makefile/.gitignore/README
 ### Task 0: 仓库骨架、Makefile、忽略规则、README
 
 **Files:**
-- Create: `repo/go.mod`（仅占位聚合；三子 module 各自独立，可空）
+- Create: `repo/bindings/huangguo/sdk/go.mod`
+- Create: `repo/bindings/huangguo/core/go.mod`
+- Create: `repo/bindings/huangguo/gen-huangguo/go.mod`
 - Create: `repo/Makefile`
 - Create: `repo/.gitignore`
 - Create: `repo/README.md`
+- （不建根 go.mod——三子 module 各自独立，逐 module 构建；临时 go.work 不入库）
 
-**Step 1: clone/init 并创建目录**
+**Step 1: clone/init、创建目录、初始化三个 module**
 
 ```bash
 gh repo create AmatsuZero/openhuangguo-swift   # 授权后
 git clone https://github.com/AmatsuZero/openhuangguo-swift.git && cd openhuangguo-swift
 mkdir -p bindings/huangguo/{sdk/model,core/dispatch,gen-huangguo,ios/Sources/OpenHuangguo,android/src/main/kotlin/dev/openhuangguo} Sources/OpenHuangguo .github/workflows scripts
+cat > bindings/huangguo/sdk/go.mod <<'EOF'
+module github.com/AmatsuZero/openhuangguo-swift/bindings/huangguo/sdk
+
+go 1.22
+EOF
+cat > bindings/huangguo/core/go.mod <<'EOF'
+module github.com/AmatsuZero/openhuangguo-swift/bindings/huangguo/core
+
+go 1.26.0
+
+require github.com/AmatsuZero/openhuangguo-swift/bindings/huangguo/sdk v0.0.0
+
+replace github.com/AmatsuZero/openhuangguo-swift/bindings/huangguo/sdk => ../sdk
+
+tool golang.org/x/mobile/cmd/gobind
+EOF
+cat > bindings/huangguo/gen-huangguo/go.mod <<'EOF'
+module github.com/AmatsuZero/openhuangguo-swift/bindings/huangguo/gen-huangguo
+
+go 1.22
+EOF
+(cd bindings/huangguo/core && go mod tidy)   # 生成独立 go.sum，锁定 gomobile 版本
 ```
 
 **Step 2: .gitignore（忽略 workspace 与产物）**
@@ -98,7 +123,7 @@ vet:
 test:
 	@for m in $(MODULES); do (cd $$m && GOWORK=off go test ./...) || exit 1; done
 gen-check:
-	cd bindings/huangguo/gen-huangguo && GOWORK=off go run . --repo-root ../..
+	cd bindings/huangguo/gen-huangguo && GOWORK=off go run . --repo-root ../../..
 	git diff --exit-code -- bindings/huangguo/ios/Sources/OpenHuangguo/Types.swift bindings/huangguo/android/src/main/kotlin/dev/openhuangguo/Types.kt
 all: fmt vet test gen-check
 ```
@@ -123,13 +148,16 @@ git add . && git commit -m "chore: repo skeleton, Makefile, gitignore, README"
 - Create: `repo/bindings/huangguo/sdk/transport_test.go`
 - Create: `repo/bindings/huangguo/sdk/testdata/feed.json`（按 types.ts 构造的首批 fixture）
 
-**Step 1: 定义公共契约（先写类型，后面 Task 都依赖）**
+**Step 1: 定义公共契约（先写类型，后面 Task 都依赖；本 Task 结束时 sdk 包须能独立编译）**
 
 ```go
 // transport.go
 package sdk
 
-import "context"
+import (
+    "context"
+    "net/http"
+)
 
 // Transport 是内部 HTTP 抽象（不 gomobile 绑定）。测试注入 fake 实现。
 type Transport interface {
@@ -148,19 +176,52 @@ type Response struct {
     Headers    map[string]string
     Body       []byte
 }
+
+// TransportConfig 由 configJSON 构造。Proxy: nil=走环境；指向 ""=强制直连；指向 URL=显式代理。
+type TransportConfig struct { Proxy *string }
+
+// HTTPTransport 是 Transport 的真实实现，持有可注入的 *http.Client（测试塞 fake RoundTripper）。
+type HTTPTransport struct {
+    client *http.Client
+    cfg    TransportConfig
+}
+func NewHTTPTransport(cfg TransportConfig) *HTTPTransport {
+    return &HTTPTransport{client: &http.Client{Timeout: 30 * time.Second}, cfg: cfg}
+}
+// Do 的完整实现（代理解析/目标守卫/重定向）在 Task 4 补齐；本 Task 先给能编译的最小 Do
+// （含目标守卫，Bearer 原样放行），测试即可验证。
+func (t *HTTPTransport) Do(ctx context.Context, req *Request) (*Response, error) { /* Task4 完善 */ }
 ```
 
-**Step 2: Options/Logger/Client 骨架（client.go 顶部，NewClient 可先最小实现）**
+```go
+// store.go（本 Task 只放接口与 Session 定义；MemStore/FileStore 实现在 Task 3）
+package sdk
+import "encoding/json"
+type Session struct {
+    Origin     string          `json:"origin"`
+    Token      string          `json:"token"`
+    Generation int64           `json:"generation"`
+    User       json.RawMessage `json:"user"`
+}
+type TokenStore interface {
+    Load() (Session, error)
+    Save(Session) error
+    Clear() error
+}
+```
+
+**Step 2: Options/Logger/Client 骨架（client.go，本 Task 完整可编译）**
 
 ```go
 // client.go
 package sdk
+import "sync"
 
 type Logger interface { Printf(format string, args ...any) }
 
 type Options struct {
     Transport Transport  // 必填
-    Store     TokenStore // 必填（Task 3 定义；此处先用接口占位，编译依赖在 Task 3 满足）
+    Store     TokenStore // 必填
     Base      string
     Proxy     *string    // nil=走环境；指向 ""=强制直连；指向 URL=显式代理
     CredTrust map[string]bool
@@ -169,17 +230,29 @@ type Options struct {
 }
 
 type Client struct {
-    transport Transport
-    store     TokenStore
-    base      string
-    credTrust map[string]bool
-    logger    Logger
+    mu            sync.Mutex      // 保护 base / snapshot 读取
+    transport     Transport
+    store         TokenStore
+    base          string
+    credTrust     map[string]bool
+    logger        Logger
     retryAttempts int
 }
-func NewClient(o Options) (*Client, error) { /* 校验必填、规范化 base、默认 credTrust；本 Task 只到骨架 */ }
+
+// NewClient：校验 Transport/Store 必填；base 规范化（normalizeBase 在 Task 3 实现，本 Task 先内联最小校验）
+// 默认 credTrust = {https://huangguoai.com:true, https://huangguoai.ai:true}；不发请求。
+func NewClient(o Options) (*Client, error) { /* ... */ }
+
+// snapshot：原子读 {origin, token, generation} + 当前 base，供 edge 全程使用同一份（Task 4 使用）。
+// 定义放在这里，保证 Task 1 编译闭合。
+func (c *Client) snapshot() (Session, string) {
+    c.mu.Lock(); base := c.base; c.mu.Unlock()
+    s, _ := c.store.Load()
+    return s, base
+}
 ```
 
-> **说明**：Task 1 编译时 `TokenStore` 尚未定义会失败。解决：Task 1 与 Task 3 合并提交，或在 Task 1 同文件内先声明 `type TokenStore interface { ... }`（Task 3 再补实现）。采用后者——在 client.go 里声明接口签名，Task 3 只加实现文件。
+> **本 Task 完成标志**：`GOWORK=off go build ./...` 通过（HTTPTransport/TransportConfig/Session/TokenStore/Client/snapshot 均已定义）；Task 3 只**新增** MemStore/FileStore/normalizeBase/SetBase，不改这些签名。
 
 **Step 3: 写失败测试（Bearer 用注入 fake，不用回环 server）**
 
@@ -584,11 +657,14 @@ func (c *Client) SetBase(raw string) error {
     return c.store.Save(s)
 }
 
-// snapshot：原子读 {origin, token, generation}，供 edge 使用（避免并发 SetBase 旧 token 发新地址）
-func (c *Client) snapshot() Session { s, _ := c.store.Load(); return s }
+// 说明：snapshot() 已在 Task 1 定义（返回 (Session, string)，含当前 base），本 Task 不再重复定义。
+// allowedCredentialTarget 改为接受显式 origin 参数，避免读取可变的 c.base（见 Task 4 用法）。
+func (c *Client) allowedCredentialTarget(origin string) bool {
+    return c.credTrust[origin] // origin 为规范化完整 origin（含端口）
+}
 ```
 
-- 凭据检查在 `do`/`edge` 里对**所有携带密码或非空 Bearer** 的请求做（不限 needCred 分支）。
+- 凭据检查在 `edge` 里对**所有携带密码或非空 Bearer** 的请求做（不限 needCred 分支）；用快照里的 origin 判断，不用 c.base。
 
 **Step 4: 运行确认通过**
 
@@ -628,8 +704,10 @@ func TestEdgeHTTPStatusBeforeEnvelope(t *testing.T) {
     // 用 fakeTransport 返回对应 Response，断言 edge 结果
 }
 func TestEdgeEnvelopeFields(t *testing.T) {
-    // 无 body：body/content_type 两空串；有 body：base64(JSON)+application/json
-    // 断言外层 headers 含 Content-Type: application/json（信封内的 content_type 不能替代）
+    // 用 HTTPTransport + 注入 fake RoundTripper（不走网络、不用回环）：
+    //   捕获 *http.Request，断言外层 Content-Type: application/json、Authorization: Bearer ...
+    //   解码请求体为 edgeEnvelope，断言 method/path、无 body 时两空串、有 body 时 base64+application/json
+    // 这同时证明真实 HTTPTransport 放行 Bearer（fakeTransport 无法证明这点）
 }
 ```
 
@@ -653,8 +731,10 @@ type CodeError struct { Code int; Message, Name, Kind string }
 func (e *CodeError) Error() string { return e.Message }
 
 func (c *Client) edge(ctx context.Context, method, path string, body any, needCred bool) ([]byte, error) {
-    // 1. 取快照 s := c.snapshot()（origin/token/generation 原子）
-    // 2. 若 needCred 或 s.Token!="" → 若 !allowedCredentialTarget() 拒绝（镜像不收密码/Bearer）
+    // 1. 一次取快照：s, base := c.snapshot()（token + 当前 base 同一份，全程用它）
+    s, base := c.snapshot()
+    // 2. 凭据检查用快照 base：若 needCred 或 s.Token!="" → !allowedCredentialTarget(base) 则拒绝
+    //    （镜像不收密码/Bearer；远端 URL 也用 base 拼，不用 c.base）
     // 3. 编码信封（marshal 错误必须传播）
     enc, ctype := "", ""
     if body != nil {
@@ -662,11 +742,12 @@ func (c *Client) edge(ctx context.Context, method, path string, body any, needCr
         enc = base64.StdEncoding.EncodeToString(b); ctype = "application/json"
     }
     payload, err := json.Marshal(edgeEnvelope{method, path, enc, ctype}); if err != nil { return nil, err }
-    // 4. headers：Accept、Content-Type: application/json（外层）、Referer
-    //    token 来自快照 s.Token（不用 c.base 重新取）
-    // 5. resp := c.transport.Do(ctx, &Request{...})
+    // 4. headers：Accept、Content-Type: application/json（外层）、Referer: base+"/"
+    //    Bearer 来自快照 s.Token；URL = base+"/api/edge/request"（全程同一 base）
+    // 5. resp := c.transport.Do(ctx, &Request{Method:"POST", URL: base+"/api/edge/request", ...})
     // 6. 先判 HTTP 状态：401/403→ErrAuth；4xx→错误；5xx/408/425/429→可重试错误；非 2xx→错误
-    // 7. 再 parseEdgeResponse(resp.Body)
+    // 7. 提交登录结果前再校验 generation 未变（s.Generation==当前），否则丢弃
+    // 8. 再 parseEdgeResponse(resp.Body)
 }
 
 func parseEdgeResponse(raw []byte) ([]byte, error) {
@@ -901,7 +982,10 @@ func LoadModelOnly(root string) (*Schema, error) {
 ```go
 package main
 func TestGenerateHuangguoTypes(t *testing.T) {
-    s, err := schema.LoadModelOnly("../..") // gen module 在 bindings/huangguo/gen-huangguo，仓库相对根是 ../..
+    // 测试在 gen 模块目录 bindings/huangguo/gen-huangguo 运行：
+    //   仓库根 = ../../..；schema 的 huangguo 根 = <repo>/bindings/huangguo = ../..
+    huangguoRoot := "../.."
+    s, err := schema.LoadModelOnly(huangguoRoot) // 内部拼 <root>/sdk/model
     if err != nil { t.Fatal(err) }
     swift := swiftTypes(s); kotlin := kotlinTypes(s)
     for _, want := range []string{"struct VideoCard", "struct Detail", "struct PlayInfo"} {
@@ -915,9 +999,11 @@ func TestGenerateHuangguoTypes(t *testing.T) {
 
 ```go
 // main.go
-// flag: --repo-root（默认 "."）；输出路径：
-//   <root>/bindings/huangguo/ios/Sources/OpenHuangguo/Types.swift
-//   <root>/bindings/huangguo/android/src/main/kotlin/dev/openhuangguo/Types.kt
+// flag: --repo-root（默认 "."，指仓库根 repo/）；
+//   schema.LoadModelOnly(filepath.Join(repoRoot, "bindings", "huangguo"))
+// 输出路径：
+//   <repoRoot>/bindings/huangguo/ios/Sources/OpenHuangguo/Types.swift
+//   <repoRoot>/bindings/huangguo/android/src/main/kotlin/dev/openhuangguo/Types.kt
 // 生成规则照搬：JSON 名→驼峰；零值缺省；指针可空；枚举具名。
 // 先 os.MkdirAll 输出目录再写文件。
 ```
@@ -926,7 +1012,7 @@ func TestGenerateHuangguoTypes(t *testing.T) {
 
 ```bash
 cd repo/bindings/huangguo/gen-huangguo && GOWORK=off go test ./... -v
-cd repo/bindings/huangguo/gen-huangguo && GOWORK=off go run . --repo-root ../..
+cd repo/bindings/huangguo/gen-huangguo && GOWORK=off go run . --repo-root ../../..
 cd repo && git diff --exit-code -- bindings/huangguo/ios/Sources/OpenHuangguo/Types.swift bindings/huangguo/android/src/main/kotlin/dev/openhuangguo/Types.kt
 ```
 Expected: PASS；生成文件已提交且无 drift。
@@ -995,19 +1081,25 @@ func NewClient(configJSON string, logger Logger) (*Client, error) {
     return &Client{c: c, store: store}, err
 }
 
-// token 桥接：单返回值 + error，gomobile 可绑定；原生层在 Keychain/Keystore 读写后调用
+// token 桥接：单返回值 + error，gomobile 可绑定。
+// SetTokenJSON 仅用于**启动恢复**：把原生持久化快照灌入内存 store，不得在会话中调用覆盖
+// SDK 正在管理的 generation（否则旧快照会覆盖新状态）。登录/登出/切 base 的状态变化走 dispatch 方法。
 func (cl *Client) SetTokenJSON(s string) error {
     var sess sdk.Session
     if err := json.Unmarshal([]byte(s), &sess); err != nil { return err }
-    return cl.store.Save(sess) // generation 由 SDK 管理；原生只持久化快照
+    return cl.store.Save(sess)
 }
 func (cl *Client) GetTokenJSON() (string, error) {
     sess, err := cl.store.Load(); if err != nil { return "", err }
     b, err := json.Marshal(sess); return string(b), err
 }
 
-// 持久化时序：登录/注册/登出/SetBase 后由原生层在 callback 里调 GetTokenJSON 回写 Keychain；
-// 启动时先 SetTokenJSON 恢复。Clear/Save 失败经回调的 error envelope 返回，原生须视为硬错误。
+// 持久化时序（避免 callback 结束后无法传播错误）：
+//   原生 async API 的流程 = Start(method) → callback 收到 result/error →
+//     若为登录/注册/登出/SetBase 且成功 → 调 GetTokenJSON 写 Keychain/Keystore →
+//     **持久化完成后**才 resolve 原生 Promise/Future；写失败则 reject 并把错误返回调用方。
+//   绝不在 callback 已完成（Promise 已 resolve）后再做持久化——那样失败无法回传。
+//   启动时先 SetTokenJSON 恢复。Clear/Save 失败一律视为硬错误上报，不静默成功。
 
 func (cl *Client) Start(method, argsJSON string, cb Callback) *Call {
     ctx, cancel := context.WithCancel(context.Background())
@@ -1065,6 +1157,8 @@ git commit -m "feat(core): gomobile entry, token JSON bridge and dispatch table"
 
 ```swift
 // Client.swift：封装 Start/callback 为 async；SetTokenJSON/GetTokenJSON 接 Keychain（定义 TokenStoring 协议）
+// 登录/注册/登出/SetBase 的 async 包装：callback 成功后先 GetTokenJSON 写 Keychain，写入成功才 resolve，
+// 写失败则 throw（对应 core 层的"持久化完成后再结束"约定）
 // PlayerResourceLoader.swift：AVAssetResourceLoaderDelegate
 //   - hg://localhost/seg?u= 还原上游 URL
 //   - 调 Core 的 decryptCover/rewritePlaylist/fetchSegment（经 JSON，解码 base64 body）
@@ -1133,8 +1227,8 @@ NEW_URL = ".../OpenHuangguoCore.xcframework.zip"
 ```
 1. 先把含改动的 main 推到 openhuangguo-swift
 2. 打 hg-xcf-v* 标签 → 触发 hg-xcf.yml：编译 → 校验 → zip+checksum → 回填本仓库 Package.swift → publish release（资产 OpenHuangguoCore.xcframework.zip）
-3. 回填提交后，在最新 main 上打**消费者源码版本 tag** hg-v*（如 hg-v0.1.0）——SwiftPM 消费者用这个 tag 解析到含正确 URL/checksum 的 Package.swift
-4. hg-xcf-v* 仅作二进制资产 tag，不作为 SwiftPM 版本（与 hongguo 的 xcf-v*/v* 分工一致）
+3. 回填提交后，在最新 main 上打**标准语义版本 tag** `v0.1.0`（纯 semver，SwiftPM 可解析）——消费者用 `.package(url: ..., from: "0.1.0")` 解析到含正确 URL/checksum 的 Package.swift。用 `hg-v0.1.0` 这类非纯 semver tag 会导致 SwiftPM 无法按版本解析
+4. `hg-xcf-v*` 仅作二进制资产 tag，不作为 SwiftPM 版本；只有 `vX.Y.Z` 是消费者版本（与 hongguo 的 `xcf-v*`/`v*` 分工一致）
 ```
 
 **Step 4: hg-xcf.yml（隔离）**
@@ -1146,15 +1240,21 @@ NEW_URL = ".../OpenHuangguoCore.xcframework.zip"
 # 不写任何 hongguo 文件；不触发 hongguo 的 release.yml
 ```
 
-**Step 5: ci.yml 门禁接通（codex #8：needs + 验证对象含实际发布的 Sources/OpenHuangguo）**
+**Step 5: 验证门禁接通（codex #8：跨 workflow 不能用 needs，改用可复用 workflow）**
+
+不同 workflow 的 jobs 不能直接 `needs` 关联。方案：抽出 `.github/workflows/verify.yml`（`on: workflow_call` + `push`/`PR`），包含全部验证 jobs；`ci.yml` 与 `hg-xcf.yml` 都通过 `uses: ./.github/workflows/verify.yml` 调用它。
 
 ```yaml
-# jobs:
-#   go: GOWORK=off 逐 module fmt/vet/test + gen-check
-#   ios: build.sh ios + swift test（验证 Sources/OpenHuangguo 壳）
-#   android: build.sh android + gradle test
-# release job 在 hg-xcf.yml 内 needs 上述验证（或把验证抽成可复用 workflow 被 both 调用）
-# 断言：只有验证 jobs 全绿，hg-xcf-v* 的 release job 才运行
+# verify.yml（workflow_call）：
+#   jobs.go:        GOWORK=off 逐 module fmt/vet/test + gen-check
+#   jobs.ios:       build.sh ios + swift test；验证对象含实际发布的根目录 Sources/OpenHuangguo
+#   jobs.android:   build.sh android + gradle test + 模拟器/设备任务跑播放器 seek 验证
+#                   （不是仅 gradle test；Media3 播放器链路需真实渲染环境）
+#   jobs.player-e2e: 主清单→子清单→KEY→分片→seek 最小验证（macOS 模拟器 + Android 模拟器）
+# hg-xcf.yml：
+#   jobs.verify:  uses: ./.github/workflows/verify.yml
+#   jobs.release: needs: verify  （同 workflow 内 needs 成立）
+# 断言：只有 verify 全部 jobs 全绿，hg-xcf-v* 的 release job 才运行
 ```
 
 **Step 6: 本地确认不破坏 hongguo**
@@ -1204,6 +1304,6 @@ git commit -am "test: full validation gate fixes" || echo "no changes"
 
 1. 本地 `make all` 全绿；生成文件无 drift。
 2. xcframework 编译/打包/发版由 CI（`hg-xcf.yml`）执行，本地不做。
-3. 发版时序（独立仓库）：推 main → 打 `hg-xcf-v*` 触发构建+release → 回填后打 `hg-v*` 消费者 tag。
+3. 发版时序（独立仓库）：推 main → 打 `hg-xcf-v*` 触发构建+release → 回填后打标准 semver tag `vX.Y.Z` 供 SwiftPM 消费。
 4. 若需推送当前 fork 的设计/计划文档，单独请求用户授权（发版/推送单独确认）。
 5. 整个实现**不触碰 hongguo 任何文件**；完成后用 `git -C 当前fork status` 确认 fork 除文档外无改动。
