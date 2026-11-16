@@ -6,19 +6,22 @@
 
 **Architecture:** 参考 HGhub（`AmatsuZero/study-materials-fork`）的 edge 信封接口与媒体算法，仿 hongguo SDK 形态。三模块：SDK（业务接口/transport/edge/token/媒体纯函数）、Core（gomobile 按名调用）、gen-huangguo（类型生成，schema 构建期复制改造）。所有复杂数据经 `Start`/callback 的 JSON 通道，gomobile 只导简单类型 + interface。
 
-**Tech Stack:** Go 1.26（SDK 可用更低但 Core 因 gomobile tool 用 1.26）、gomobile/gobind、标准库 net/http + crypto/aes、Swift 5.9 SwiftPM、Kotlin/Gradle、GitHub Actions。
+**Tech Stack:** Go 1.26（SDK 用 1.22 亦可，Core 因 gomobile tool 用 1.26）、gomobile/gobind、标准库 net/http + crypto/aes、Swift 5.9 SwiftPM、Kotlin/Gradle + Media3、GitHub Actions。
 
-**设计依据:** `docs/plans/2026-11-16-openhuangguo-core-design.md`（已通过 codex review）。
+**设计依据:** `docs/plans/2026-11-16-openhuangguo-core-design.md`（已通过 codex review）。本计划已纳入实现计划 review 的 13 条修订。
+
+> **关于代码示例**：本计划的 Go 片段给出**接口签名与关键逻辑**，字段细节以"按 types.ts"标注处需照参考文件逐一补全。凡给出完整 struct 的，字段 tag 均已写全、可编译；不得以占位符提交。
 
 ---
 
-## 执行前提（动手前确认，涉及外部/共享状态）
+## 执行前提（涉及外部/共享状态，需用户授权）
 
-1. **创建独立仓库** `AmatsuZero/openhuangguo-swift`（`gh repo create`，需用户授权）。所有实现代码落此仓库，**不写入当前 fork**。
+1. **创建独立仓库** `AmatsuZero/openhuangguo-swift`（`gh repo create`）。所有实现代码落此仓库，**不写入当前 fork**。
 2. 当前 fork 只保留两份设计/计划文档（已 commit，未推送）。是否推送 fork 由用户单独决定。
-3. 参考源 `/tmp/study-materials-fork` 为临时克隆；执行中若丢失，重新 `git clone --depth 1 https://github.com/AmatsuZero/study-materials-fork /tmp/study-materials-fork`。
+3. 参考源 `/tmp/study-materials-fork` 为临时克隆；丢失时 `git clone --depth 1 https://github.com/AmatsuZero/study-materials-fork /tmp/study-materials-fork`。
+4. **AGhub 没有 JSON fixture testdata**（已核实：`tests/` 只有浏览器测试页）。业务响应 fixture 由我们在 Task 1 按 `src/types.ts` 构造 + 后续从真实接口采集脱敏，不从 HGhub 复制。
 
-> 下列所有路径相对于**独立仓库根** `openhuangguo-swift/`。文中 `repo` 指该仓库根。
+> 下列路径相对**独立仓库根**（文中 `repo`）。
 
 ## 全局约定
 
@@ -26,120 +29,252 @@
   - SDK：`github.com/AmatsuZero/openhuangguo-swift/bindings/huangguo/sdk`
   - Core：`github.com/AmatsuZero/openhuangguo-swift/bindings/huangguo/core`
   - gen：`github.com/AmatsuZero/openhuangguo-swift/bindings/huangguo/gen-huangguo`
-- 提交粒度：每个 Task 末尾一次 commit；TDD（先红后绿）；`gofmt -l` 为空才提交。
-- 测试命令在各自 module 目录执行；本地不做 xcframework 编译/打包/发布（走 CI `hg-xcf.yml`）。
-- 每个 Go 源码文件顶部注释用中文说明职责（对齐 hongguo 风格）。
+- **本地开发可用临时 go.work（不入库、不进 CI）；CI 一律 `GOWORK=off` 逐 module 跑。**
+- 提交粒度：每 Task 末尾一次 commit；TDD（先红后绿）；`gofmt -l` 为空才提交。
+- 本地不做 xcframework 编译/打包/发布（走 CI）。
+- 关键类型先定义、后被依赖（Transport/Options/Client 在 Task 1 定死，避免后续 Task 引用未定义类型）。
+
+## 任务依赖顺序
+
+```
+Task 0 骨架/Makefile/.gitignore/README
+  └─ Task 1 SDK 公共契约(Transport/Options/Logger/Client 骨架/fixture 构造)
+       ├─ Task 2 model 具名类型
+       ├─ Task 3 store + 凭据信任 + SetBase
+       ├─ Task 4 edge 信封 + 响应解析
+       │    └─ Task 5 全部业务接口 + play 回退（用 Task1 fixture）
+       └─ Task 6 媒体纯函数
+  └─ Task 7 gen-huangguo（schema 复制改造）
+       └─ Task 8 core gomobile 入口 + dispatch
+            └─ Task 9 移动端壳（iOS/Android 完整工程）
+  └─ Task 10 构建脚本 + hg-xcf.yml + Package.swift + 回填脚本
+  └─ Task 11 全量验证门禁
+```
 
 ---
 
-### Task 0: 仓库骨架与 module 初始化
+### Task 0: 仓库骨架、Makefile、忽略规则、README
 
 **Files:**
-- Create: `repo/go.mod`（可选，根聚合；若不需要可省，三 module 各自独立）
-- Create: `repo/bindings/huangguo/sdk/go.mod`
-- Create: `repo/bindings/huangguo/core/go.mod`
-- Create: `repo/bindings/huangguo/gen-huangguo/go.mod`
+- Create: `repo/go.mod`（仅占位聚合；三子 module 各自独立，可空）
+- Create: `repo/Makefile`
 - Create: `repo/.gitignore`
+- Create: `repo/README.md`
 
-**Step 1: 创建仓库并初始化三 module**
+**Step 1: clone/init 并创建目录**
 
 ```bash
-gh repo create AmatsuZero/openhuangguo-swift --private  # 或 --public，用户定
-cd openhuangguo-swift
-cat > bindings/huangguo/sdk/go.mod <<'EOF'
-module github.com/AmatsuZero/openhuangguo-swift/bindings/huangguo/sdk
-
-go 1.22
-EOF
-cat > bindings/huangguo/core/go.mod <<'EOF'
-module github.com/AmatsuZero/openhuangguo-swift/bindings/huangguo/core
-
-go 1.26.0
-
-require github.com/AmatsuZero/openhuangguo-swift/bindings/huangguo/sdk v0.0.0
-
-replace github.com/AmatsuZero/openhuangguo-swift/bindings/huangguo/sdk => ../sdk
-
-tool golang.org/x/mobile/cmd/gobind
-EOF
-cat > bindings/huangguo/gen-huangguo/go.mod <<'EOF'
-module github.com/AmatsuZero/openhuangguo-swift/bindings/huangguo/gen-huangguo
-
-go 1.22
-EOF
+gh repo create AmatsuZero/openhuangguo-swift   # 授权后
+git clone https://github.com/AmatsuZero/openhuangguo-swift.git && cd openhuangguo-swift
+mkdir -p bindings/huangguo/{sdk/model,core/dispatch,gen-huangguo,ios/Sources/OpenHuangguo,android/src/main/kotlin/dev/openhuangguo} Sources/OpenHuangguo .github/workflows scripts
 ```
 
-**Step 2: 初始化 core 的 go.sum（gobind tool）**
+**Step 2: .gitignore（忽略 workspace 与产物）**
 
-```bash
-cd repo/bindings/huangguo/core && go mod tidy
+```gitignore
+go.work
+go.work.sum
+*.a
+*.aar
+*.xcframework
+*.xcframework.zip
+build/
+bin/
+.openhongguo-build/     # 若借用
+.gradle/
+**/build/
 ```
-Expected: 生成 go.sum，含 golang.org/x/mobile 等；`tool gobind` 解析成功。
 
-**Step 3: 验证三 module 可独立构建**
+**Step 3: Makefile（逐 module 入口）**
 
-```bash
-cd repo/bindings/huangguo/sdk && go build ./...
-cd repo/bindings/huangguo/core && go build ./...   # 此时 core 还没有 .go，可先放一个占位 package
+```makefile
+MODULES := bindings/huangguo/sdk bindings/huangguo/core bindings/huangguo/gen-huangguo
+
+.PHONY: fmt vet test gen-check all
+fmt:
+	@for m in $(MODULES); do (cd $$m && gofmt -w $$(find . -name '*.go')); done
+vet:
+	@for m in $(MODULES); do (cd $$m && GOWORK=off go vet ./...) || exit 1; done
+test:
+	@for m in $(MODULES); do (cd $$m && GOWORK=off go test ./...) || exit 1; done
+gen-check:
+	cd bindings/huangguo/gen-huangguo && GOWORK=off go run . --repo-root ../..
+	git diff --exit-code -- bindings/huangguo/ios/Sources/OpenHuangguo/Types.swift bindings/huangguo/android/src/main/kotlin/dev/openhuangguo/Types.kt
+all: fmt vet test gen-check
 ```
-Expected: 无编译错误。
 
-**Step 4: Commit**
+**Step 4: README 骨架**
+
+说明：工具链（Go 1.26 / gomobile / Xcode / Android SDK）、生成命令 `make gen-check`、包消费方式（SwiftPM 指向本仓库 `Package.swift` binaryTarget）、**token 持久化失败边界**（Clear 持久化失败不保证跨重启退出，宿主须视为硬错误）、本地不打包走 CI。
+
+**Step 5: Commit**
 
 ```bash
-cd repo && git add . && git commit -m "chore: init modules for huangguo core"
+git add . && git commit -m "chore: repo skeleton, Makefile, gitignore, README"
 ```
 
 ---
 
-### Task 1: SDK model 具名类型
+### Task 1: SDK 公共契约 + fixture 构造
+
+**Files:**
+- Create: `repo/bindings/huangguo/sdk/transport.go`（接口 + HTTPTransport）
+- Create: `repo/bindings/huangguo/sdk/client.go`（Options/Logger/Client 骨架/NewClient）
+- Create: `repo/bindings/huangguo/sdk/transport_test.go`
+- Create: `repo/bindings/huangguo/sdk/testdata/feed.json`（按 types.ts 构造的首批 fixture）
+
+**Step 1: 定义公共契约（先写类型，后面 Task 都依赖）**
+
+```go
+// transport.go
+package sdk
+
+import "context"
+
+// Transport 是内部 HTTP 抽象（不 gomobile 绑定）。测试注入 fake 实现。
+type Transport interface {
+    Do(ctx context.Context, req *Request) (*Response, error)
+}
+
+type Request struct {
+    Method string
+    URL    string
+    Headers map[string]string
+    Body   []byte
+    MaxResponseBytes int64 // 媒体设大值，API 用默认 8MB
+}
+type Response struct {
+    StatusCode int
+    Headers    map[string]string
+    Body       []byte
+}
+```
+
+**Step 2: Options/Logger/Client 骨架（client.go 顶部，NewClient 可先最小实现）**
+
+```go
+// client.go
+package sdk
+
+type Logger interface { Printf(format string, args ...any) }
+
+type Options struct {
+    Transport Transport  // 必填
+    Store     TokenStore // 必填（Task 3 定义；此处先用接口占位，编译依赖在 Task 3 满足）
+    Base      string
+    Proxy     *string    // nil=走环境；指向 ""=强制直连；指向 URL=显式代理
+    CredTrust map[string]bool
+    Logger    Logger
+    RetryAttempts int
+}
+
+type Client struct {
+    transport Transport
+    store     TokenStore
+    base      string
+    credTrust map[string]bool
+    logger    Logger
+    retryAttempts int
+}
+func NewClient(o Options) (*Client, error) { /* 校验必填、规范化 base、默认 credTrust；本 Task 只到骨架 */ }
+```
+
+> **说明**：Task 1 编译时 `TokenStore` 尚未定义会失败。解决：Task 1 与 Task 3 合并提交，或在 Task 1 同文件内先声明 `type TokenStore interface { ... }`（Task 3 再补实现）。采用后者——在 client.go 里声明接口签名，Task 3 只加实现文件。
+
+**Step 3: 写失败测试（Bearer 用注入 fake，不用回环 server）**
+
+```go
+type fakeTransport struct { gotAuth string; resp *Response }
+func (f *fakeTransport) Do(ctx context.Context, r *Request) (*Response, error) {
+    f.gotAuth = r.Headers["Authorization"]
+    return f.resp, nil
+}
+func TestTransportAllowsBearer(t *testing.T) {
+    // 用 fakeTransport 注入，断言 Authorization 头原样送出不报错（区别于 hongguo 的拒绝）
+}
+func TestTargetGuards(t *testing.T) {
+    // 独立测试：https://u:p@example.com/ 与 http://127.0.0.1:1/ 被 HTTPTransport 拒绝
+    // （用真实 HTTPTransport，不发网络：校验在 Do 开头目标检查阶段）
+}
+```
+
+**Step 4: 构造 fixture（按 types.ts，不依赖 HGhub）**
+
+```bash
+# testdata/feed.json：{"status":1,"data":{"items":[{...VideoCard 全字段...}],"pagination":{...}}}
+# 每个可选字段至少覆盖"存在"与"缺失"两种，供 Task 5/11 校验字段解析
+```
+
+**Step 5: 验证**
+
+```bash
+cd repo/bindings/huangguo/sdk && GOWORK=off go test ./... -v && GOWORK=off go vet ./...
+```
+Expected: PASS（transport 守卫测试通过；TokenStore 接口已声明故编译过）。
+
+**Step 6: Commit**
+
+```bash
+git commit -m "feat(sdk): transport interface, client options and initial fixtures"
+```
+
+---
+
+### Task 2: model 具名类型（完整可编译代码，无占位）
 
 **Files:**
 - Create: `repo/bindings/huangguo/sdk/model/model.go`
 - Create: `repo/bindings/huangguo/sdk/model/model_test.go`
 
-**Step 1: 写失败测试（JSON 反序列化对齐 src/types.ts）**
+**Step 1: 写失败测试（完整解码 + 序列化键名断言）**
 
 ```go
 package model
 
 import (
     "encoding/json"
+    "strings"
     "testing"
 )
 
-func TestVideoCardJSON(t *testing.T) {
-    raw := `{"id":1,"title":"t","cover":"c","tags":["a"],"score":9,
-      "episode_count":2,"total_episodes":2,"hot":100,"like_count":3,
-      "collect_count":4,"comment_count":5,"is_finished":true,"is_original":1,
-      "author":{"id":7,"name":"n"}}`
+func TestVideoCardRoundTrip(t *testing.T) {
+    raw := `{"id":1,"title":"t","cover":"c","description":"d","tags":["a"],"score":9,
+      "episode_count":2,"total_episodes":3,"hot":100,"like_count":3,"collect_count":4,
+      "comment_count":5,"is_finished":true,"is_original":1,"author":{"id":7,"name":"n","followers":8}}`
     var v VideoCard
     if err := json.Unmarshal([]byte(raw), &v); err != nil { t.Fatal(err) }
-    if v.ID != 1 || v.Author == nil || v.Author.ID != 7 { t.Fatalf("bad: %+v", v) }
+    if v.ID != 1 || v.Author == nil || v.Author.ID != 7 || v.Author.Followers != 8 { t.Fatalf("bad: %+v", v) }
+    out, _ := json.Marshal(v)
+    for _, key := range []string{`"episode_count"`, `"total_episodes"`, `"is_finished"`, `"like_count"`} {
+        if !strings.Contains(string(out), key) { t.Fatalf("missing key %s in %s", key, out) }
+    }
 }
 
-func TestPagedInstancesAndNestedStructs(t *testing.T) {
-    // 分页具名类型 + Detail.counts/author + PlayInfo.streams 具名结构
+func TestDetailAndPlayInfoNested(t *testing.T) {
+    raw := `{"id":1,"title":"t","description":"d","cover":"c","tags":[],
+      "score":9,"episode_count":1,"total_episodes":1,"episodes":[],
+      "counts":{"collect":1,"comment":2,"hot":3,"like":4},
+      "author":{"id":3,"name":"n","is_following":true,"following":5,"like_count":6},
+      "is_finished":true,"is_original":0,"video_url":""}`
     var d Detail
-    if err := json.Unmarshal([]byte(`{"id":1,"counts":{"like":2},"author":{"id":3},
-      "episodes":[]}`), &d); err != nil { t.Fatal(err) }
-    if d.Counts.Like != 2 || d.Author.ID != 3 { t.Fatalf("bad: %+v", d) }
+    if err := json.Unmarshal([]byte(raw), &d); err != nil { t.Fatal(err) }
+    if d.Counts.Like != 4 || d.Author.ID != 3 || !d.Author.IsFollowing { t.Fatalf("bad: %+v", d) }
     var p PlayInfo
-    if err := json.Unmarshal([]byte(`{"id":1,"streams":{"main":"http://m"}}`), &p); err != nil { t.Fatal(err) }
-    if p.Streams == nil || p.Streams.Main != "http://m" { t.Fatalf("bad: %+v", p) }
+    if err := json.Unmarshal([]byte(`{"id":1,"ep_num":2,"video_url":"http://m","streams":{"main":"http://m"}}`), &p); err != nil { t.Fatal(err) }
+    if p.EpNum != 2 || p.Streams == nil || p.Streams.Main != "http://m" { t.Fatalf("bad: %+v", p) }
 }
 ```
 
 **Step 2: 运行确认失败**
 
 ```bash
-cd repo/bindings/huangguo/sdk && go test ./model/ -run 'TestVideoCardJSON|TestPagedInstances' -v
+cd repo/bindings/huangguo/sdk && GOWORK=off go test ./model/ -v
 ```
 Expected: FAIL（类型未定义）。
 
-**Step 3: 实现具名类型（对照 /tmp/study-materials-fork/src/types.ts）**
+**Step 3: 实现完整具名类型（每字段独立 tag，无简写、无重复定义）**
 
-`model.go` 要点（字段 JSON tag 与 TS 完全一致；嵌套/分页必须具名，供 schema AST 解析）：
+`model.go`（对照 `/tmp/study-materials-fork/src/types.ts` 逐字段补全，以下为可直接编译的骨架，标注处按 types.ts 补齐）：
 
 ```go
 package model
@@ -149,6 +284,16 @@ type Author struct {
     Name      string `json:"name"`
     Avatar    string `json:"avatar,omitempty"`
     Followers int    `json:"followers,omitempty"`
+}
+
+// DetailAuthor 是详情里的作者（TS 的 Author & {is_following?...}），单独具名
+type DetailAuthor struct {
+    ID          int64  `json:"id"`
+    Name        string `json:"name"`
+    Avatar      string `json:"avatar,omitempty"`
+    IsFollowing bool   `json:"is_following,omitempty"`
+    Following   int    `json:"following,omitempty"`
+    LikeCount   int    `json:"like_count,omitempty"`
 }
 
 type VideoCard struct {
@@ -173,278 +318,365 @@ type VideoCard struct {
     Author        *Author  `json:"author,omitempty"`
 }
 
-type Pagination struct { Page, Pages, Size, Total int `json:"page,..." /* 各自 tag */` }
-// 用完整字段：
 type Pagination struct {
     Page  int `json:"page"`
     Pages int `json:"pages"`
     Size  int `json:"size"`
     Total int `json:"total"`
 }
+// 分页具名实例（避免泛型，供 schema AST 解析）
+type VideoCardPage struct {
+    Items      []VideoCard `json:"items"`
+    Pagination Pagination  `json:"pagination"`
+}
+type PostPage struct {
+    Items      []Post     `json:"items"`
+    Pagination Pagination `json:"pagination"`
+}
+type CommentPage struct {
+    EP         int        `json:"ep"`
+    Revision   string     `json:"revision,omitempty"`
+    Reset      bool       `json:"reset,omitempty"`
+    Items      []Comment  `json:"items"`
+    Pagination Pagination `json:"pagination"`
+}
+type SearchResult struct {
+    Items      []VideoCard `json:"items"`
+    Pagination Pagination  `json:"pagination"`
+    Keyword    string      `json:"keyword"`
+}
 
-// 分页具名实例（避免泛型，供 schema 解析）
-type VideoCardPage struct { Items []VideoCard `json:"items"`; Pagination Pagination `json:"pagination"` }
-type PostPage      struct { Items []Post      `json:"items"`; Pagination Pagination `json:"pagination"` }
-type CommentPage   struct { EP int `json:"ep"`; Revision string `json:"revision,omitempty"`; Reset bool `json:"reset,omitempty"`; Items []Comment `json:"items"`; Pagination Pagination `json:"pagination"` }
-type SearchResult  struct { Items []VideoCard `json:"items"`; Pagination Pagination `json:"pagination"`; Keyword string `json:"keyword"` }
-
-type Episode struct { EpNum int `json:"ep_num"`; Title string `json:"title"`; Duration int `json:"duration"`; Status int `json:"status"` }
-
-type DetailCounts struct { Collect, Comment, Hot, Like int64 /* 各自 tag */ }
-// 完整：
+type Episode struct {
+    EpNum    int    `json:"ep_num"`
+    Title    string `json:"title"`
+    Duration int    `json:"duration"`
+    Status   int    `json:"status"`
+}
+type TagLink struct {
+    Name string `json:"name"`
+    URL  string `json:"url"`
+}
 type DetailCounts struct {
     Collect int64 `json:"collect"`
     Comment int64 `json:"comment"`
     Hot     int64 `json:"hot"`
     Like    int64 `json:"like"`
 }
+type Interaction struct {
+    Collected bool `json:"collected"`
+    Liked     bool `json:"liked"`
+    LikedEP   int  `json:"liked_ep,omitempty"`
+}
 type Detail struct {
-    ID int64 `json:"id"`; Title, Description, Cover string `json:"title,..."`
-    // 全部字段按 types.ts，嵌套用具名：
-    Tags        []string          `json:"tags"`
-    TagLinks    []TagLink         `json:"tag_links,omitempty"`
-    Score       float64           `json:"score"`
-    EpisodeCount, TotalEpisodes int `json:"episode_count,..."`
-    Episodes    []Episode         `json:"episodes"`
-    Counts      DetailCounts      `json:"counts"`
-    Author      Author            `json:"author"`
-    Interaction *Interaction      `json:"interaction,omitempty"`
-    VideoURL    string            `json:"video_url,omitempty"`
-    VideoURLHevc string           `json:"video_url_hevc,omitempty"`
-    IsFinished  bool              `json:"is_finished"`
-    IsOriginal  int               `json:"is_original"`
-    VideoType   int               `json:"video_type,omitempty"`
-    Duration    int               `json:"duration,omitempty"`
-    CreatedAt   string            `json:"created_at,omitempty"`
+    ID            int64         `json:"id"`
+    Title         string        `json:"title"`
+    Description   string        `json:"description"`
+    Cover         string        `json:"cover"`
+    Tags          []string      `json:"tags"`
+    TagLinks      []TagLink     `json:"tag_links,omitempty"`
+    Score         float64       `json:"score"`
+    EpisodeCount  int           `json:"episode_count"`
+    TotalEpisodes int           `json:"total_episodes"`
+    Episodes      []Episode     `json:"episodes"`
+    Counts        DetailCounts  `json:"counts"`
+    Author        DetailAuthor  `json:"author"`
+    Interaction   *Interaction  `json:"interaction,omitempty"`
+    VideoURL      string        `json:"video_url,omitempty"`
+    VideoURLHevc  string        `json:"video_url_hevc,omitempty"`
+    IsFinished    bool          `json:"is_finished"`
+    IsOriginal    int           `json:"is_original"`
+    VideoType     int           `json:"video_type,omitempty"`
+    Duration      int           `json:"duration,omitempty"`
+    CreatedAt     string        `json:"created_at,omitempty"`
 }
-type TagLink struct { Name, URL string }
-type Interaction struct { Collected, Liked bool; LikedEP int `json:"liked_ep,omitempty"` }
 
-type Streams struct { Main, Hevc, Preview string /* 各自 tag */ }
+type Streams struct {
+    Main    string `json:"main,omitempty"`
+    Hevc    string `json:"hevc,omitempty"`
+    Preview string `json:"preview,omitempty"`
+}
 type PlayInfo struct {
-    ID int64; EpNum int; Duration int; Title string
-    VideoURL string `json:"video_url"`
-    VideoURLHevc string `json:"video_url_hevc,omitempty"`
-    Streams *Streams `json:"streams,omitempty"`
+    ID           int64    `json:"id"`
+    EpNum        int      `json:"ep_num"`
+    Duration     int      `json:"duration"`
+    Title        string   `json:"title"`
+    VideoURL     string   `json:"video_url"`
+    VideoURLHevc string   `json:"video_url_hevc,omitempty"`
+    Streams      *Streams `json:"streams,omitempty"`
 }
 
-type RankMetrics struct { Collect, Comment, Like, Play int64 }
-type RankItem struct { /* 按 types.ts；Metrics RankMetrics `json:"metrics"` */ }
+type RankMetrics struct {
+    Collect int64 `json:"collect"`
+    Comment int64 `json:"comment"`
+    Like    int64 `json:"like"`
+    Play    int64 `json:"play"`
+}
+type RankItem struct {
+    Rank         int64       `json:"rank"`
+    VideoID      int64       `json:"video_id"`
+    Title        string      `json:"title"`
+    Cover        string      `json:"cover"`
+    Tags         []string    `json:"tags"`
+    Score        float64     `json:"score"`
+    CateName     string      `json:"cate_name"`
+    EpisodeCount int         `json:"episode_count"`
+    IsFinished   bool        `json:"is_finished"`
+    MetricLabel  string      `json:"metric_label"`
+    MetricValue  int64       `json:"metric_value"`
+    Metrics      RankMetrics `json:"metrics"`
+}
 
-type Comment struct { /* 按 types.ts；ReplyList []Comment `json:"reply_list,omitempty"` */ }
-type Post struct { /* 按 types.ts，Counts 具名 */ }
-type User struct { /* 按 types.ts，Interactions 具名，LikeVideoEpisode 具名 */ }
+type Comment struct {
+    ID         int64      `json:"id"`
+    UserID     int64      `json:"user_id"`
+    Nickname   string     `json:"nickname"`
+    Avatar     string     `json:"avatar"`
+    AvatarColor string    `json:"avatar_color"`
+    Text       string     `json:"text"`
+    Time       string     `json:"time"`
+    CreatedAt  string     `json:"created_at,omitempty"`
+    LikeCount  int64      `json:"like_count"`
+    Liked      bool       `json:"liked"`
+    ReplyCount int        `json:"reply_count"`
+    ReplyID    int64      `json:"reply_id"`
+    ReplyList  []Comment  `json:"reply_list,omitempty"`
+    IsPinned   bool       `json:"is_pinned,omitempty"`
+    IPRegion   string     `json:"ip_region,omitempty"`
+}
+
+type PostAuthor struct {
+    ID          int64  `json:"id"`
+    Name        string `json:"name"`
+    Avatar      string `json:"avatar,omitempty"`
+    IsFollowing bool   `json:"is_following,omitempty"`
+}
+type PostCounts struct {
+    Like    int64 `json:"like"`
+    Comment int64 `json:"comment"`
+    Collect int64 `json:"collect"`
+    Share   int64 `json:"share,omitempty"`
+    Hot     int64 `json:"hot,omitempty"`
+}
+type Post struct {
+    ID          int64      `json:"id"`
+    Title       string     `json:"title"`
+    Desc        string     `json:"desc,omitempty"`
+    Content     string     `json:"content,omitempty"`
+    Cover       string     `json:"cover"`
+    Tags        []string   `json:"tags"`
+    Hot         int64      `json:"hot"`
+    VideoURL    string     `json:"video_url,omitempty"`
+    VideoID     int64      `json:"video_id,omitempty"`
+    Author      *PostAuthor `json:"author,omitempty"`
+    Counts      *PostCounts `json:"counts,omitempty"`
+    CreatedAt   string     `json:"created_at,omitempty"`
+    PublishTime string     `json:"publish_time,omitempty"`
+}
+
+type LikeVideoEpisode struct {
+    VideoID int64 `json:"video_id"`
+    EP      int   `json:"ep"`
+}
+type UserInteractions struct {
+    LikeVideoIDs     []int64           `json:"like_video_ids"`
+    FavoriteVideoIDs []int64           `json:"favorite_video_ids"`
+    FollowUserIDs    []int64           `json:"follow_user_ids"`
+    LikeVideoEpisodes []LikeVideoEpisode `json:"like_video_episodes"`
+}
+type User struct {
+    ID          int64            `json:"id"`
+    Username    string           `json:"username"`
+    Nickname    string           `json:"nickname"`
+    Avatar      string           `json:"avatar"`
+    AvatarColor string           `json:"avatar_color"`
+    Sign        string           `json:"sign,omitempty"`
+    Desc        string           `json:"desc,omitempty"`
+    UserType    string           `json:"user_type,omitempty"`
+    Counts      map[string]int64 `json:"counts,omitempty"`
+    Interactions *UserInteractions `json:"interactions,omitempty"`
+}
 ```
-
-> 实现时把所有 `/* 各自 tag */` 与省略字段按 `types.ts` 补全，不得遗漏；用 `omitempty` 对应 TS 的可选字段；指针对应可空。
 
 **Step 4: 运行确认通过**
 
 ```bash
-cd repo/bindings/huangguo/sdk && go test ./model/ -v
+cd repo/bindings/huangguo/sdk && GOWORK=off go test ./model/ -v && GOWORK=off go vet ./...
 ```
 Expected: PASS。
 
 **Step 5: Commit**
 
 ```bash
-git add bindings/huangguo/sdk/model && git commit -m "feat(sdk): add named model types aligned with HGhub"
+git commit -m "feat(sdk): complete named model types aligned with types.ts"
 ```
 
 ---
 
-### Task 2: SDK transport（代理 + 轻守卫 + 重定向）
+### Task 3: store、凭据信任、SetBase
 
 **Files:**
-- Create: `repo/bindings/huangguo/sdk/transport.go`
-- Create: `repo/bindings/huangguo/sdk/transport_test.go`
+- Create: `repo/bindings/huangguo/sdk/store.go`（Task1 声明的接口，这里实现）
+- Create: `repo/bindings/huangguo/sdk/client_base.go`（base 规范化/凭据信任/SetBase/do 取快照）
+- Create: `repo/bindings/huangguo/sdk/store_test.go`
 
 **Step 1: 写失败测试**
 
 ```go
 package sdk
-
-import (
-    "context"
-    "net/http"
-    "net/http/httptest"
-    "testing"
-)
-
-func TestTransportSendsBearerHeader(t *testing.T) {
-    // 自建 httptest server，transport 必须能发送 Authorization（不同于 hongguo）
-    var got string
-    srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        got = r.Header.Get("Authorization"); w.Write([]byte(`{"status":1,"data":{}}`))
-    }))
-    defer srv.Close()
-    tr := NewTransport(TransportConfig{})
-    req := &Request{Method: "POST", URL: srv.URL, Headers: map[string]string{"Authorization": "Bearer tok"}, Body: []byte(`{}`)}
-    if _, err := tr.Do(context.Background(), req); err != nil { t.Fatal(err) }
-    if got != "Bearer tok" { t.Fatalf("authorization not sent: %q", got) }
+func TestSessionOriginBindingAndGeneration(t *testing.T) {
+    m := NewMemStore()
+    m.Save(Session{Origin:"https://huangguoai.com", Token:"tok", Generation:1, User: json.RawMessage(`{}`)})
+    if _, err := m.Load(); err != nil { t.Fatal(err) }
+    // 换 origin 读应拒绝；Clear 后 Load 为空；generation 递增
 }
-
-func TestTransportRejectsUserInfoAndPrivateTarget(t *testing.T) {
-    tr := NewTransport(TransportConfig{})
-    for _, u := range []string{"https://user:pass@example.com/", "http://127.0.0.1:1/", "https://evil.example:443/"} {
-        if _, err := tr.Do(context.Background(), &Request{Method:"GET", URL:u}); err == nil {
-            t.Fatalf("expected reject: %s", u)
-        }
+func TestNormalizeBaseAndCredentialTrust(t *testing.T) {
+    for _, raw := range []string{"http://huangguoai.com", "https://u:p@huangguoai.com", "https://huangguoai.com/x", "http://127.0.0.1"} {
+        if _, err := normalizeBase(raw); err == nil { t.Fatalf("should reject %s", raw) }
     }
+    c, _ := NewClient(Options{Transport: &fakeTransport{}, Store: NewMemStore(), Base:"https://huangguoai.ai"})
+    if !c.allowedCredentialTarget() { t.Fatal("huangguoai.ai should be trusted") }
 }
-
-func TestProxyEnvPriorityAndExplicitDirect(t *testing.T) {
-    // 显式 ProxyURL > HGHUB_PROXY > HTTPS_PROXY；空字符串 = 强制直连
-    c := NewTransport(TransportConfig{})
-    c.resolveProxy("https://api.example.com") // 断言按优先级返回
-}
+func TestSetBaseClearsToken(t *testing.T) { /* ... */ }
 ```
 
 **Step 2: 运行确认失败**
 
 ```bash
-cd repo/bindings/huangguo/sdk && go test . -run 'TestTransport' -v
+cd repo/bindings/huangguo/sdk && GOWORK=off go test . -run 'TestSession|TestNormalizeBase|TestSetBase' -v
 ```
-Expected: FAIL（NewTransport/Request 未定义）。
+Expected: FAIL。
 
-**Step 3: 实现 transport**
+**Step 3: 实现**
 
-`transport.go` 要点：
-
+`store.go`：
 ```go
-package sdk
-
-// Request/Response 是本 SDK 内部 HTTP 抽象（不直接 gomobile 绑定）。
-type Request struct {
-    Method string
-    URL    string
-    Headers map[string]string
-    Body   []byte
-    // NoRedirect 为 true 时禁止自动跳转
-    NoRedirect bool
+type Session struct {
+    Origin     string          `json:"origin"`      // 显式小写 tag，GetTokenJSON 输出稳定
+    Token      string          `json:"token"`
+    Generation int64           `json:"generation"`
+    User       json.RawMessage `json:"user"`
 }
-type Response struct {
-    StatusCode int
-    Headers map[string]string
-    Body []byte
-}
-type TransportConfig struct {
-    ProxyURL string // 显式代理；"" 且未设 EnvDirect 时走环境回退；特殊值 "direct" 表示强制直连
-}
-type Transport struct { cfg TransportConfig; client *http.Client }
-
-func NewTransport(cfg TransportConfig) *Transport {
-    // http.Client{Timeout:30s, CheckRedirect: 见下}
-    // Redirect: 默认禁止跳转（edge 用）；媒体可在 Request 层放开有限跳转
-}
-
-// resolveProxy 按优先级：显式 cfg.ProxyURL > HGHUB_PROXY > HTTPS_PROXY/ALL_PROXY/HTTP_PROXY；
-// 环境变量回退遵循 NO_PROXY；显式代理忽略 NO_PROXY；"direct" 强制直连。
-// 首版只 http/https，不支持 socks。
-func (t *Transport) resolveProxy(target string) (*url.URL, error) { /* ... */ }
-
-func (t *Transport) Do(ctx context.Context, req *Request) (*Response, error) {
-    // 1. 校验目标 URL：禁 user:pass、禁内网/回环/保留地址（媒体请求的目标同样校验）
-    // 2. 代理 URL 与目标 URL 分开校验：代理地址不套用目标的"禁内网"规则
-    // 3. 构造 http.Request（header 原样带上，含 Authorization）
-    // 4. client.Do；错误里代理凭据必须脱敏（redactProxy）
-    // 5. 读 body：API 8MB 上限；媒体由调用方设更大上限（见 FetchSegment）
-    // 6. 返回 Response；重定向策略见 client.CheckRedirect
-}
+// TokenStore 接口已在 Task1 client.go 声明；这里给 MemStore / FileStore
+type MemStore struct { mu sync.Mutex; s Session }
+func NewMemStore() *MemStore { ... }
+func (m *MemStore) Load() (Session, error) { /* mu.Lock; return copy */ }
+func (m *MemStore) Save(s Session) error  { /* mu.Lock; m.s = s */ }
+func (m *MemStore) Clear() error          { /* mu.Lock; m.s = Session{} */ }
+// FileStore：0600 + tmp+rename 原子写；Clear 删文件失败必须返回错误
 ```
 
-- 禁内网判定用 `net.ParseIP` + `ip.IsLoopback()/IsPrivate()/IsLinkLocalUnicast()/IsUnspecified()`；域名 `localhost`/`*.local`/`*.internal` 拒绝。
-- `redactProxy` 只回显 scheme://host:port，隐藏 userinfo/path/query。
-- 媒体跳转最多 5 跳、逐跳校验、禁 HTTPS→HTTP 降级：在 `CheckRedirect` 或媒体专用 do 循环实现。
+`client_base.go`：
+```go
+// normalizeBase：HTTPS 纯 origin，无 userinfo/path/query/fragment，禁内网/回环
+func normalizeBase(raw string) (string, error) { /* url.Parse + 校验 + net.ParseIP 守卫 */ }
+
+// allowedCredentialTarget 用规范化后的完整 origin（含端口）比较信任名单，不用 hostOf
+func (c *Client) allowedCredentialTarget() bool {
+    return c.credTrust[c.base] // c.base 是规范化完整 origin
+}
+
+// SetBase：mu 锁；generation++；store.Clear()；返回 Clear 结果（持久化失败不谎称成功）
+func (c *Client) SetBase(raw string) error {
+    b, err := normalizeBase(raw); if err != nil { return err }
+    c.mu.Lock(); defer c.mu.Unlock()
+    c.base = b
+    s, _ := c.store.Load(); s.Generation++; s.Origin = ""; s.Token = ""; s.User = nil
+    return c.store.Save(s)
+}
+
+// snapshot：原子读 {origin, token, generation}，供 edge 使用（避免并发 SetBase 旧 token 发新地址）
+func (c *Client) snapshot() Session { s, _ := c.store.Load(); return s }
+```
+
+- 凭据检查在 `do`/`edge` 里对**所有携带密码或非空 Bearer** 的请求做（不限 needCred 分支）。
 
 **Step 4: 运行确认通过**
 
 ```bash
-cd repo/bindings/huangguo/sdk && go test . -run 'TestTransport' -v && go vet ./...
+cd repo/bindings/huangguo/sdk && GOWORK=off go test . -run 'TestSession|TestNormalizeBase|TestSetBase' -v && GOWORK=off go vet ./...
 ```
 Expected: PASS。
 
 **Step 5: Commit**
 
 ```bash
-git add bindings/huangguo/sdk/transport.go bindings/huangguo/sdk/transport_test.go && git commit -m "feat(sdk): transport with proxy, guards and redirect policy"
+git commit -m "feat(sdk): token stores, credential trust and origin-bound base switching"
 ```
 
 ---
 
-### Task 3: SDK edge 信封与响应解析
+### Task 4: edge 信封与响应解析（含 HTTP 状态处理）
 
 **Files:**
 - Create: `repo/bindings/huangguo/sdk/edge.go`
 - Create: `repo/bindings/huangguo/sdk/edge_test.go`
 
-**Step 1: 写失败测试（精确响应语义）**
+**Step 1: 写失败测试（HTTP 状态 × body 组合）**
 
 ```go
 package sdk
-
-func TestEdgeEnvelopeEncoding(t *testing.T) {
-    // 无 body：body/content_type 均为空串；有 body：base64(JSON)+application/json
-    // 断言发给 /api/edge/request 的 JSON 信封字段
-}
-
-func TestEdgeResponseSemantics(t *testing.T) {
-    cases := []struct{ body string; wantOK bool; wantData string }{
-        {``, true, `null`},                       // 空串成功
-        {`null`, true, `null`},                   // JSON null 成功
-        {`{}`, false, ``},                        // 裸 {} 失败（无 status）
-        {`{"status":1,"data":{}}`, true, `{}`},   // data:{} 成功
-        {`{"status":0,"msg":"bad"}`, false, ``},  // status!=1 失败
+func TestEdgeHTTPStatusBeforeEnvelope(t *testing.T) {
+    cases := []struct{ status int; body string; wantErr bool }{
+        {200, `{"status":1,"data":{}}`, false},
+        {200, ``, false},                    // 空 body 成功
+        {200, `null`, false},                // null 成功
+        {200, `{}`, true},                   // 裸 {} 失败
+        {401, ``, true},                     // 401 即使空 body 也失败
+        {500, ``, true},                     // 500 失败（且可重试分类）
+        {200, `{"status":0,"msg":"bad"}`, true},
     }
-    // 对每个 case 起 httptest，调用 edge，断言结果
+    // 用 fakeTransport 返回对应 Response，断言 edge 结果
+}
+func TestEdgeEnvelopeFields(t *testing.T) {
+    // 无 body：body/content_type 两空串；有 body：base64(JSON)+application/json
+    // 断言外层 headers 含 Content-Type: application/json（信封内的 content_type 不能替代）
 }
 ```
 
 **Step 2: 运行确认失败**
 
 ```bash
-cd repo/bindings/huangguo/sdk && go test . -run 'TestEdge' -v
+cd repo/bindings/huangguo/sdk && GOWORK=off go test . -run 'TestEdge' -v
 ```
-Expected: FAIL（edge 未定义）。
+Expected: FAIL。
 
-**Step 3: 实现 edge**
+**Step 3: 实现 edge（先处理 HTTP 状态，再解析信封）**
 
 ```go
-package sdk
-
 type edgeEnvelope struct {
-    Method      string `json:"method"`
-    Path        string `json:"path"`
-    Body        string `json:"body"`
+    Method string `json:"method"`
+    Path   string `json:"path"`
+    Body   string `json:"body"`
     ContentType string `json:"content_type"`
 }
-
 type CodeError struct { Code int; Message, Name, Kind string }
 func (e *CodeError) Error() string { return e.Message }
 
-// edge 把 method/path/body 封成信封 POST 到 base/api/edge/request。
-// retry 由调用方 client.do 统一处理；这里只做单次请求 + 响应解析。
-func (c *Client) edge(ctx context.Context, method, path string, body any, token string) ([]byte, error) {
-    enc := ""
-    ctype := ""
+func (c *Client) edge(ctx context.Context, method, path string, body any, needCred bool) ([]byte, error) {
+    // 1. 取快照 s := c.snapshot()（origin/token/generation 原子）
+    // 2. 若 needCred 或 s.Token!="" → 若 !allowedCredentialTarget() 拒绝（镜像不收密码/Bearer）
+    // 3. 编码信封（marshal 错误必须传播）
+    enc, ctype := "", ""
     if body != nil {
-        b, _ := json.Marshal(body)
-        enc = base64.StdEncoding.EncodeToString(b)
-        ctype = "application/json"
+        b, err := json.Marshal(body); if err != nil { return nil, err }
+        enc = base64.StdEncoding.EncodeToString(b); ctype = "application/json"
     }
-    payload, _ := json.Marshal(edgeEnvelope{method, path, enc, ctype})
-    headers := map[string]string{"Accept": "application/json", "Referer": c.base + "/"}
-    if token != "" { headers["Authorization"] = "Bearer " + token }
-    req := &Request{Method:"POST", URL: c.base + "/api/edge/request", Headers: headers, Body: payload}
-    resp, err := c.transport.Do(ctx, req) // 禁止重定向
-    if err != nil { return nil, err }
-    return parseEdgeResponse(resp.Body)
+    payload, err := json.Marshal(edgeEnvelope{method, path, enc, ctype}); if err != nil { return nil, err }
+    // 4. headers：Accept、Content-Type: application/json（外层）、Referer
+    //    token 来自快照 s.Token（不用 c.base 重新取）
+    // 5. resp := c.transport.Do(ctx, &Request{...})
+    // 6. 先判 HTTP 状态：401/403→ErrAuth；4xx→错误；5xx/408/425/429→可重试错误；非 2xx→错误
+    // 7. 再 parseEdgeResponse(resp.Body)
 }
 
 func parseEdgeResponse(raw []byte) ([]byte, error) {
     s := strings.TrimSpace(string(raw))
     if s == "" || s == "null" { return []byte("null"), nil }
-    var v struct { Status *int `json:"status"`; Data json.RawMessage `json:"data"`; Msg string `json:"msg"` }
+    var v struct {
+        Status *int `json:"status"`
+        Data json.RawMessage `json:"data"`
+        Msg string `json:"msg"`
+    }
     if err := json.Unmarshal(raw, &v); err != nil { return nil, err }
     if v.Status != nil && *v.Status == 1 {
         if len(v.Data) == 0 { return []byte("null"), nil }
@@ -455,234 +687,143 @@ func parseEdgeResponse(raw []byte) ([]byte, error) {
 }
 ```
 
+- 外层 `Content-Type: application/json` 必设；信封内 `content_type` 描述的是 body 的媒体类型，二者不同。
+
 **Step 4: 运行确认通过**
 
 ```bash
-cd repo/bindings/huangguo/sdk && go test . -run 'TestEdge' -v && go vet ./...
+cd repo/bindings/huangguo/sdk && GOWORK=off go test . -run 'TestEdge' -v && GOWORK=off go vet ./...
 ```
 Expected: PASS。
 
 **Step 5: Commit**
 
 ```bash
-git add bindings/huangguo/sdk/edge.go bindings/huangguo/sdk/edge_test.go && git commit -m "feat(sdk): edge envelope and exact response semantics"
+git commit -m "feat(sdk): edge envelope with HTTP status handling and exact response semantics"
 ```
 
 ---
 
-### Task 4: SDK TokenStore、凭据信任与 client 基础
-
-**Files:**
-- Create: `repo/bindings/huangguo/sdk/store.go`
-- Create: `repo/bindings/huangguo/sdk/client.go`
-- Create: `repo/bindings/huangguo/sdk/store_test.go`
-- Create: `repo/bindings/huangguo/sdk/client_test.go`
-
-**Step 1: 写失败测试**
-
-```go
-package sdk
-
-func TestSessionOriginBindingAndGeneration(t *testing.T) {
-    m := NewMemStore()
-    m.Save(Session{Origin:"https://huangguoai.com", Token:"tok", Generation:1})
-    // 换 origin 读取应为空；generation 递增后旧快照失效
-}
-func TestSetBaseClearsTokenAndCredentialTrust(t *testing.T) {
-    // setBase 到镜像域名后 token 被清；镜像不能接收密码/Bearer
-}
-func TestCredentialTrust(t *testing.T) {
-    // 默认 huangguoai.com/.ai 放行凭据；evil.example 拒绝密码/Bearer
-}
-```
-
-**Step 2: 运行确认失败**
-
-```bash
-cd repo/bindings/huangguo/sdk && go test . -run 'TestSession|TestSetBase|TestCredentialTrust' -v
-```
-Expected: FAIL。
-
-**Step 3: 实现 store + client 基础**
-
-`store.go`：
-```go
-type Session struct { Origin, Token string; Generation int64; User json.RawMessage }
-type TokenStore interface {
-    Load() (Session, error)
-    Save(Session) error
-    Clear() error
-}
-type MemStore struct { mu sync.Mutex; s Session }
-// Load/Save/Clear 实现；Clear 立即内存失效
-// FileStore：0600 + tmp+rename 原子写；Clear 删文件失败必须返回错误
-```
-
-`client.go`：
-```go
-type Client struct {
-    transport Transport // 用接口便于测试注入
-    store TokenStore
-    base string
-    credTrust map[string]bool // 默认 huangguoai.com / .ai
-    clock func() time.Time
-    logger Logger
-    retryAttempts int
-    mu sync.Mutex
-}
-func NewClient(opts Options) (*Client, error) {
-    // 必填 transport/store；base 规范化；默认 credential trust
-}
-func normalizeBase(raw string) (string, error) // HTTPS 纯 origin，无 userinfo/path/query/fragment，禁内网
-func (c *Client) allowedCredentialTarget() bool { return c.credTrust[hostOf(c.base)] }
-func (c *Client) SetBase(raw string) error { // 规范化；mu 锁；generation++；store.Clear() }
-func (c *Client) do(ctx, method, path, body, needCred) ([]byte, error) {
-    // 重试循环照搬 hongguo client.go:122-174；判定按 HGhub（无 body GET 可带 token、播放 POST 可重试、408/425/429/5xx）
-    // needCred 且 !allowedCredentialTarget → 拒绝（镜像不收密码/Bearer）
-    // 取 token：原子读 origin+generation 快照；generation 变化时禁止提交登录结果
-}
-```
-
-- generation 失效：登录响应提交前再次校验当前 generation 与发起时一致，不一致丢弃。
-- 失败语义：`Clear` 持久化失败返回错误，不谎称跨重启成功（见设计 #6）。
-
-**Step 4: 运行确认通过**
-
-```bash
-cd repo/bindings/huangguo/sdk && go test . -run 'TestSession|TestSetBase|TestCredentialTrust' -v && go vet ./...
-```
-Expected: PASS。
-
-**Step 5: Commit**
-
-```bash
-git add bindings/huangguo/sdk/store.go bindings/huangguo/sdk/client.go bindings/huangguo/sdk/*_test.go && git commit -m "feat(sdk): token store, credential trust and client base"
-```
-
----
-
-### Task 5: SDK 全部业务接口（约 20 个）
+### Task 5: 全部业务接口 + play 回退
 
 **Files:**
 - Create: `repo/bindings/huangguo/sdk/api.go`
 - Create: `repo/bindings/huangguo/sdk/api_test.go`
+- Modify: `repo/bindings/huangguo/sdk/testdata/*.json`（补齐各接口 fixture）
 
-**Step 1: 写失败测试（用 mock transport 回放 HGhub fixture）**
+**Step 1: 写失败测试（调用具名方法，验证模型字段而非裸字节）**
 
 ```go
 package sdk
-
-func TestLoginAndMe(t *testing.T) {
-    // mock transport 返回 {"status":1,"data":{"token":"t","user":{...}}}
-    // 断言 Login 存 token、Me 带 Bearer
+func TestFeedParsesFixture(t *testing.T) {
+    fake := &fakeTransport{resp: &Response{StatusCode:200, Body: mustRead("testdata/feed.json")}}
+    c, _ := NewClient(Options{Transport: fake, Store: NewMemStore(), Base:"https://huangguoai.com"})
+    page, err := c.Feed(ctx, 1, 20)
+    if err != nil { t.Fatal(err) }
+    if len(page.Items) == 0 || page.Pagination.Total == 0 { t.Fatalf("fields lost: %+v", page) }
 }
-func TestPlayFallbackAndStreamsNormalization(t *testing.T) {
-    // 新接口 POST /episodes/{ep}/playback 返回 streams.main → 回填 VideoURL
-    // 新接口无地址时回退 GET /play?ep=...&page_texts=0（对齐 api.rs:473-528）
+func TestPlayFallbackAndStreams(t *testing.T) {
+    // 新接口 streams.main → 回填 VideoURL；无地址时回退旧 GET /play
 }
-func TestAllBusinessEndpoints(t *testing.T) {
-    // 逐个断言 method/path/参数：feed/category/rank/search/posts/post/video/
-    // comments/commentSend/like/collect/follow/postLike/postCollect/postComments
+func TestAllEndpointsPaths(t *testing.T) {
+    // fakeTransport 记录 req.URL/method 断言 path（对照 api.rs）
 }
 ```
 
 **Step 2: 运行确认失败**
 
 ```bash
-cd repo/bindings/huangguo/sdk && go test . -run 'TestLogin|TestPlay|TestAllBusiness' -v
+cd repo/bindings/huangguo/sdk && GOWORK=off go test . -run 'TestFeed|TestPlay|TestAllEndpoints' -v
 ```
 Expected: FAIL。
 
-**Step 3: 实现 api.go（方法表对照 /tmp/study-materials-fork/src-tauri/src/api.rs）**
+**Step 3: 实现 api.go（方法表对照 api.rs:314-626）**
 
-```go
-// 每个方法：构造 path（含 query，用 url.QueryEscape）+ 调 c.do
-// method/path 对照（来自 api.rs）：
-// login: POST /api/account/loginByPassword {username,password}
-// register: POST /api/account/registerByPassword {username,password,confirm_password,email?}
-// logout: POST /api/account/logout
-// me: GET /api/account/me
-// feed: GET /api/videos?page=&size=
-// category: GET /api/videos/category/{cate}?page=&size=
-// rank: GET /api/ranks/{kind}  (kind 限定 recommend|potential|hot)
-// search: GET /api/search?q=<escaped>&page=&size=
-// posts: GET /api/posts?page=&size=
-// post: GET /api/posts/{id}
-// video: GET /api/videos/{id}
-// play: 见下（双接口回退）
-// comments: GET /api/videos/{id}/comments?ep=&page=&size=
-// commentSend: POST /api/videos/{id}/comments[?ep=] {text,reply_id?}
-// like: POST|DELETE /api/videos/{id}/like?ep=
-// collect: POST|DELETE /api/videos/{id}/collect
-// follow: POST|DELETE /api/users/{uid}/follow
-// postLike: POST|DELETE /api/posts/{id}/like
-// postCollect: POST|DELETE /api/posts/{id}/collect
-// postComments: GET /api/posts/{id}/comments?page=&size=
+方法→`method/path`（用 `url.QueryEscape` 编码 query）：
 ```
+Login  POST /api/account/loginByPassword      {username,password}
+Register POST /api/account/registerByPassword  {username,password,confirm_password,email?}
+Logout POST /api/account/logout
+Me     GET  /api/account/me
+Feed   GET  /api/videos?page=&size=
+Category GET /api/videos/category/{cate}?page=&size=
+Rank   GET  /api/ranks/{kind}    (kind 限 recommend|potential|hot，否则 hot)
+Search GET  /api/search?q=<escaped>&page=&size=
+Posts  GET  /api/posts?page=&size=
+Post   GET  /api/posts/{id}
+Video  GET  /api/videos/{id}
+Play   见下
+Comments GET /api/videos/{id}/comments?ep=&page=&size=
+CommentSend POST /api/videos/{id}/comments[?ep=]  {text,reply_id?}
+Like   POST|DELETE /api/videos/{id}/like?ep=
+Collect POST|DELETE /api/videos/{id}/collect
+Follow POST|DELETE /api/users/{uid}/follow
+PostLike POST|DELETE /api/posts/{id}/like
+PostCollect POST|DELETE /api/posts/{id}/collect
+PostComments GET /api/posts/{id}/comments?page=&size=
+```
+`SetBase` 已在 Task 3 实现。
 
-`Play` 实现要点（照 `api.rs:499-528`）：
+`Play`（照 `api.rs:499-528`）：
 ```go
-func (c *Client) Play(ctx, id int64, ep int) (*model.PlayInfo, error) {
-    // 1. POST /api/videos/{id}/episodes/{ep}/playback body {}
-    // 2. normalizeStreams：streams.main/hevc 回填到 VideoURL/VideoURLHevc（若原字段空）
-    // 3. 若 video_url 非空 → 返回
-    // 4. 否则 GET /api/videos/{id}/play?ep={ep}&page_texts=0，normalize 后返回
-    // 5. 两者都失败 → 返回新接口结果/错误
+func (c *Client) Play(ctx context.Context, id int64, ep int) (*model.PlayInfo, error) {
+    // 1. POST /api/videos/{id}/episodes/{ep}/playback  body {}
+    // 2. normalizeStreams：streams.main/hevc 回填 VideoURL/VideoURLHevc（原字段空时）
+    // 3. video_url 非空→返回；否则 GET /api/videos/{id}/play?ep={ep}&page_texts=0，normalize 后返回
+    // 4. 两者都失败→返回新接口结果/错误
 }
 ```
-
-`like/collect/follow` 等写操作 `needCred=true`，禁止盲重试；`commentSend` 同理。
+写操作（login/register/commentSend/like/collect/follow/postLike/postCollect）`needCred=true`（发送密码或 Bearer 时凭据信任检查在 edge 统一做），禁止盲重试。
 
 **Step 4: 运行确认通过**
 
 ```bash
-cd repo/bindings/huangguo/sdk && go test . -v && go vet ./...
+cd repo/bindings/huangguo/sdk && GOWORK=off go test ./... -v && GOWORK=off go vet ./...
 ```
 Expected: PASS。
 
 **Step 5: Commit**
 
 ```bash
-git add bindings/huangguo/sdk/api.go bindings/huangguo/sdk/api_test.go && git commit -m "feat(sdk): all business endpoints with play fallback"
+git commit -m "feat(sdk): all business endpoints, play fallback and fixtures"
 ```
 
 ---
 
-### Task 6: SDK 媒体纯函数
+### Task 6: 媒体纯函数
 
 **Files:**
 - Create: `repo/bindings/huangguo/sdk/media.go`
 - Create: `repo/bindings/huangguo/sdk/media_test.go`
 
-**Step 1: 写失败测试（对齐 media.rs fixture）**
+**Step 1: 写失败测试（对齐 media.rs）**
 
 ```go
 package sdk
-
-func TestDecryptCoverPlainPassthroughAndCipher(t *testing.T) {
-    // 明文 JPEG/PNG 直接透传；密文用 key/IV 解密后去 padding
+func TestDecryptCover(t *testing.T) {
+    // 明文 JPEG/PNG 直接透传；密文解密 + 去 padding；无效 padding 保留原文
 }
-func TestRewritePlaylistFullBehavior(t *testing.T) {
-    in := "\ufeff#EXTM3U\n#EXT-X-CONTENT-STEERING:URI=\"x\"\n" +
-      "#EXT-X-DATERANGE:ID=\"a\",X-ASSET-LIST=\"b\",DURATION=1\n" +
-      "#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\nseg-1.ts\nsub/list.m3u8\n"
-    got := RewritePlaylist("https://cdn.example/master.m3u8", "hg://localhost", "hg://localhost", in)
-    // 断言：CONTENT-STEERING 删除；DATERANGE 去 URI/X-ASSET-LIST 保留 DURATION；
-    // KEY URI 改写为本地协议；分片/子清单 URL 绝对化后改写
+func TestRewritePlaylist(t *testing.T) {
+    in := "\ufeff#EXTM3U\n#EXT-X-CONTENT-STEERING:URI=\"x\"\n#EXT-X-DATERANGE:ID=\"a\",X-ASSET-LIST=\"b\",DURATION=1\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\nseg-1.ts\nsub/list.m3u8\n"
+    // 注意 localScheme="hg", host="localhost"（不是 "hg://localhost" 两次）
+    got := RewritePlaylist("https://cdn.example/master.m3u8", "hg", "localhost", in)
+    // 断言：STEERING 删除；DATERANGE 去 URI/X-ASSET-LIST 保留 DURATION；
+    // KEY URI / 分片 / 子清单 改写为 hg://localhost/seg?u=<pct>
 }
 func TestFetchSegmentRange(t *testing.T) {
-    // mock server 返回 206 + Content-Range；断言 SegmentResult.Headers 带 Content-Range
+    // fakeTransport 返回 206 + Content-Range；断言 SegmentResult.Headers 含 Content-Range
+    // Body 含 0x00/0xff 往返
 }
 ```
 
 **Step 2: 运行确认失败**
 
 ```bash
-cd repo/bindings/huangguo/sdk && go test . -run 'TestDecrypt|TestRewrite|TestFetchSegment' -v
+cd repo/bindings/huangguo/sdk && GOWORK=off go test . -run 'TestDecrypt|TestRewrite|TestFetchSegment' -v
 ```
 Expected: FAIL。
 
-**Step 3: 实现 media.go（算法照 /tmp/study-materials-fork/src-tauri/src/media.rs）**
+**Step 3: 实现（算法照 media.rs）**
 
 ```go
 package sdk
@@ -690,108 +831,116 @@ package sdk
 const imgKey = "f5d965df75336270"
 const imgIV  = "97b60394abc2fbe1"
 
-// DecryptCover：明文图片（JPEG/PNG/GIF/WEBP magic）直接返回；否则 AES-128-CBC 解密 + 条件去 padding。
-func DecryptCover(data []byte) ([]byte, error) { /* aes.NewCipher(imgKey); CBC decrypt; stripPadding */ }
+func imageKind(buf []byte) string { /* JPEG/PNG/GIF/WEBP magic，照 media.rs:87-104 */ }
 
-// RewritePlaylist：upstreamURL 作相对 URI 解析基准；改写 URI 为 localScheme://host/seg?u=<pct-encoded abs>
-// 行为矩阵：BOM 去除；CONTENT-STEERING 删除；DATERANGE 过滤 URI/X-ASSET-LIST 保留其余；
-// 含 URI=" 的属性行（KEY/MAP/MEDIA/SESSION-KEY/PART/PRELOAD-HINT）绝对化+改写；
-// 分片行绝对化+改写；子清单（.m3u8）同样改写（递归由宿主按调用处理）。
+// DecryptCover：明文图片直接返回；否则 AES-128-CBC 解密 + 条件去 padding（无效 padding 原样保留）
+func DecryptCover(data []byte) ([]byte, error) { /* cipher.NewCBCDecrypter + XOR prev 链 */ }
+
+// RewritePlaylist：upstreamURL 作相对 URI 解析基准；localScheme+host 拼本地协议前缀。
+// 行为矩阵照 media.rs:210-260：BOM；CONTENT-STEERING 删除；DATERANGE 过滤 URI/X-ASSET-LIST；
+// 含 URI=" 的属性行绝对化+改写；分片行绝对化+改写；子清单行同样改写。
 func RewritePlaylist(upstreamURL, localScheme, host, text string) string { /* ... */ }
 
-// SegmentResult 仅 SDK 内部使用；经 core 的 Start/callback JSON 传出。
+// SegmentResult 仅 SDK 内部，经 core 的 Start/callback JSON 传出；Body []byte 经 JSON 为 base64 字符串
 type SegmentResult struct {
     Status  int               `json:"status"`
     Headers map[string]string `json:"headers"` // Content-Range / Accept-Ranges / Content-Length
     Body    []byte            `json:"body"`
 }
-// FetchSegment：独立大上限（如 32MB），支持 Range 请求头，返回 206 状态与响应头。
+// FetchSegment：用共享 transport；MaxResponseBytes 设大值（如 32MB）；透传 Range 请求头；返回 206 状态与响应头
 func (c *Client) FetchSegment(ctx context.Context, url string, reqHeader map[string]string) (SegmentResult, error) { /* ... */ }
 ```
 
-- AES CBC：`cipher.NewCBCEncrypter` 的逆——手写块解密 + XOR prev（照 media.rs:56-75）。
-- `imageKind` 检测复刻（media.rs:87-104）。
-- 属性解析 `hlsAttributes`/`mapUriAttributes` 复刻（media.rs:148-190），注意带逗号引号值。
-- 媒体目标校验复用 transport 的守卫；分片上限独立于 API 8MB。
+- AES CBC：照 `media.rs:56-75` 手写块解密 + XOR 前一块。
+- 属性解析 `hlsAttributes`/`mapUriAttributes` 复刻 `media.rs:148-190`（带逗号引号值）。
+- 子清单识别不只看 `.m3u8`：宿主播放器层还要按 MIME / `#EXTM3U` 内容判断（照 `media.rs:322`）。
 
 **Step 4: 运行确认通过**
 
 ```bash
-cd repo/bindings/huangguo/sdk && go test . -run 'TestDecrypt|TestRewrite|TestFetchSegment' -v && go vet ./...
+cd repo/bindings/huangguo/sdk && GOWORK=off go test . -run 'TestDecrypt|TestRewrite|TestFetchSegment' -v && GOWORK=off go vet ./...
 ```
 Expected: PASS。
 
 **Step 5: Commit**
 
 ```bash
-git add bindings/huangguo/sdk/media.go bindings/huangguo/sdk/media_test.go && git commit -m "feat(sdk): pure-function media tools aligned with HGhub"
+git commit -m "feat(sdk): pure media tools (decrypt, rewrite, segment with Range)"
 ```
 
 ---
 
-### Task 7: gen-huangguo 类型生成器（schema 构建期复制改造）
+### Task 7: gen-huangguo（schema 复制改造）
 
 **Files:**
-- Create: `repo/bindings/huangguo/gen-huangguo/schema/` （从 hongguo `bindings/internal/schema` 复制）
+- Create: `repo/bindings/huangguo/gen-huangguo/schema/` （复制 hongguo `bindings/internal/schema`）
 - Create: `repo/bindings/huangguo/gen-huangguo/main.go`
 - Create: `repo/bindings/huangguo/gen-huangguo/main_test.go`
 
-**Step 1: 复制并改造 schema**
+**关键事实（codex #5）**：
+- `schema.Load(root)` 期望 `root/sdk/model`（响应模型）和 `root/sdk`（请求参数类型 QueryTypes）。我们的结构 `bindings/huangguo/sdk/model` → **root 应为 `bindings/huangguo`**（`Load` 内部拼 `sdk/model` 和 `sdk` 正好命中）。
+- **黄果业务方法参数是原始值 `(id,ep,page,size)`，没有 Options/Query 结构体** → 黄果的 `Queries` 应为空。不要再传分页类型当 QueryTypes（那会生成请求编码类型且改变字段规则）。
+- 跨 module 用 `go run . --repo-root <path>`，不能在仓库根 `go run ./bindings/...`。
+
+**Step 1: 复制 schema 并改造 loader**
 
 ```bash
 cp -R /Users/daubert/Github/openhongguo/bindings/internal/schema repo/bindings/huangguo/gen-huangguo/schema
-# 改 schema 包内 import 路径前缀（若有）为本仓库；改 QueryTypes 为可配置
+```
+改造 `schema/schema.go`：
+```go
+// Load(root) 保留；新增 LoadModelOnly(root) 只解析 root/sdk/model 的响应模型，不查 QueryTypes
+func LoadModelOnly(root string) (*Schema, error) {
+    // 复用 parseDir(filepath.Join(root,"sdk","model")) + convert + consts
+    // s.Queries 留空（黄果无请求 DTO）
+}
 ```
 
-**Step 2: 写失败测试（黄果 QueryTypes + 具名类型可解析）**
+**Step 2: 写失败测试**
 
 ```go
 package main
 func TestGenerateHuangguoTypes(t *testing.T) {
-    s, err := schema.LoadWithQueryTypes("../sdk", []string{"VideoCardPage","PostPage","CommentPage","SearchResult"})
+    s, err := schema.LoadModelOnly("../..") // gen module 在 bindings/huangguo/gen-huangguo，仓库相对根是 ../..
     if err != nil { t.Fatal(err) }
     swift := swiftTypes(s); kotlin := kotlinTypes(s)
-    if !strings.Contains(swift, "struct VideoCard") { t.Fatal("missing swift VideoCard") }
-    if !strings.Contains(kotlin, "data class VideoCard") { t.Fatal("missing kotlin VideoCard") }
+    for _, want := range []string{"struct VideoCard", "struct Detail", "struct PlayInfo"} {
+        if !strings.Contains(swift, want) { t.Fatalf("missing %s", want) }
+    }
+    if !strings.Contains(kotlin, "data class VideoCard") { t.Fatal("missing Kotlin VideoCard") }
 }
 ```
 
-**Step 3: 改造 schema 支持自定义 QueryTypes**
+**Step 3: 实现 generator（照 hongguo bindings/mobile/gen 的 swift()/kotlin()）**
 
 ```go
-// schema 包：新增 LoadWithQueryTypes(root string, queries []string) (*Schema, error)
-// 原 Load 保留（内部转调默认 QueryTypes）。把 schema.go:23-26 的 QueryTypes 改为可传入。
-// 具名类型已由 Task 1 保证（Paged<T> 实例化、嵌套具名），AST 可解析。
+// main.go
+// flag: --repo-root（默认 "."）；输出路径：
+//   <root>/bindings/huangguo/ios/Sources/OpenHuangguo/Types.swift
+//   <root>/bindings/huangguo/android/src/main/kotlin/dev/openhuangguo/Types.kt
+// 生成规则照搬：JSON 名→驼峰；零值缺省；指针可空；枚举具名。
+// 先 os.MkdirAll 输出目录再写文件。
 ```
 
-**Step 4: 实现 gen main（输出 Swift/Kotlin）**
-
-```go
-// 照 hongguo bindings/mobile/gen 的 swift()/kotlin() 生成逻辑复制改造：
-// - 输出路径：bindings/huangguo/ios/Sources/OpenHuangguo/Types.swift
-//             bindings/huangguo/android/src/main/kotlin/dev/openhuangguo/Types.kt
-// - 属性名 JSON→驼峰；零值缺省规则照搬
-// - 查询类型用黄果具名分页类型
-```
-
-**Step 5: 运行确认通过 + 生成门禁**
+**Step 4: 验证生成一致性**
 
 ```bash
-cd repo/bindings/huangguo/gen-huangguo && go test ./... -v
-cd repo && go run ./bindings/huangguo/gen-huangguo
-# 断言生成文件与预期一致（git diff 检查 / 快照测试）
+cd repo/bindings/huangguo/gen-huangguo && GOWORK=off go test ./... -v
+cd repo/bindings/huangguo/gen-huangguo && GOWORK=off go run . --repo-root ../..
+cd repo && git diff --exit-code -- bindings/huangguo/ios/Sources/OpenHuangguo/Types.swift bindings/huangguo/android/src/main/kotlin/dev/openhuangguo/Types.kt
 ```
-Expected: PASS；生成文件存在且内容正确。
+Expected: PASS；生成文件已提交且无 drift。
 
-**Step 6: Commit**
+**Step 5: Commit**
 
 ```bash
-git add bindings/huangguo/gen-huangguo && git commit -m "feat(gen): huangguo type generator with configurable query types"
+git add bindings/huangguo/gen-huangguo bindings/huangguo/ios/Sources/OpenHuangguo/Types.swift bindings/huangguo/android/src/main/kotlin/dev/openhuangguo/Types.kt
+git commit -m "feat(gen): huangguo type generator with model-only schema loader"
 ```
 
 ---
 
-### Task 8: Core gomobile 入口（按名调用 + token 桥接）
+### Task 8: core gomobile 入口 + dispatch
 
 **Files:**
 - Create: `repo/bindings/huangguo/core/core.go`
@@ -803,23 +952,24 @@ git add bindings/huangguo/gen-huangguo && git commit -m "feat(gen): huangguo typ
 
 ```go
 package core
-func TestStartReturnsResultEnvelope(t *testing.T) {
-    // 用 mock SDK client / dispatch，断言 callback.Done 收到 {"result":...} 或 {"error":{code,...}}
+func TestStartEnvelope(t *testing.T) {
+    // 调 Start("feed", "[1,20]", cb)，断言 cb 收到 {"result":...}；错误时 {"error":{code,...}}
 }
-func TestTokenBridgeJSON(t *testing.T) {
+func TestTokenBridgeRoundTrip(t *testing.T) {
     c.SetTokenJSON(`{"origin":"https://huangguoai.com","token":"t","generation":1}`)
-    got, _ := c.GetTokenJSON(); // 断言 roundtrip
+    got, _ := c.GetTokenJSON()
+    // 断言 origin/token/generation 字段小写且值一致
 }
 ```
 
 **Step 2: 运行确认失败**
 
 ```bash
-cd repo/bindings/huangguo/core && go test ./... -v
+cd repo/bindings/huangguo/core && GOWORK=off go test ./... -v
 ```
 Expected: FAIL。
 
-**Step 3: 实现 core.go（照 hongguo bindings/mobile/core/core.go:37-102）**
+**Step 3: 实现 core.go（照 hongguo core.go:37-102）**
 
 ```go
 package core
@@ -827,216 +977,233 @@ package core
 type Logger interface { Log(line string) }
 type Callback interface { Done(resultJSON string) }
 
-type Client struct { c *sdk.Client }
-
-// 构造器只收 configJSON + logger，不注入 Go interface。
-func NewClient(configJSON string, logger Logger) (*Client, error) {
-    var cfg Config // base/proxy/credTrustOrigins
-    json.Unmarshal([]byte(configJSON), &cfg)
-    store := sdk.NewMemStore() // 默认内存；原生层用 SetTokenJSON 桥接持久化
-    c, err := sdk.NewClient(sdk.Options{Store: store, Base: cfg.Base, ProxyURL: cfg.ProxyURL, ...})
-    return &Client{c: c}, err
+type Client struct {
+    c     *sdk.Client
+    store sdk.TokenStore // 持有 store 引用（类型来自 SDK），供桥接访问；不通过构造器注入接口给外部
 }
 
-// token 桥接：单返回值 + error，gomobile 可绑定。
-func (c *Client) SetTokenJSON(jsonStr string) error { /* 解析 Session，store.Save */ }
-func (c *Client) GetTokenJSON() (string, error)     { /* store.Load → JSON */ }
+// 构造器只收 configJSON + logger（gomobile 可绑定）
+func NewClient(configJSON string, logger Logger) (*Client, error) {
+    var cfg struct {
+        Base string `json:"base"`
+        Proxy *string `json:"proxy"`  // nil 缺省走环境；"" 强制直连
+        CredTrust map[string]bool `json:"credTrustOrigins"`
+    }
+    if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil { return nil, jsonError(err) }
+    store := sdk.NewMemStore() // 默认内存；原生层用 SetTokenJSON 回写/恢复
+    c, err := sdk.NewClient(sdk.Options{Transport: sdk.NewHTTPTransport(sdk.TransportConfig{Proxy: cfg.Proxy}), Store: store, Base: cfg.Base, CredTrust: cfg.CredTrust})
+    return &Client{c: c, store: store}, err
+}
 
-func (c *Client) Start(method, argsJSON string, callback Callback) *Call {
-    // goroutine: dispatch.Call(ctx, c.c, method, argsJSON) → callback.Done(envelope(v, err))
+// token 桥接：单返回值 + error，gomobile 可绑定；原生层在 Keychain/Keystore 读写后调用
+func (cl *Client) SetTokenJSON(s string) error {
+    var sess sdk.Session
+    if err := json.Unmarshal([]byte(s), &sess); err != nil { return err }
+    return cl.store.Save(sess) // generation 由 SDK 管理；原生只持久化快照
+}
+func (cl *Client) GetTokenJSON() (string, error) {
+    sess, err := cl.store.Load(); if err != nil { return "", err }
+    b, err := json.Marshal(sess); return string(b), err
+}
+
+// 持久化时序：登录/注册/登出/SetBase 后由原生层在 callback 里调 GetTokenJSON 回写 Keychain；
+// 启动时先 SetTokenJSON 恢复。Clear/Save 失败经回调的 error envelope 返回，原生须视为硬错误。
+
+func (cl *Client) Start(method, argsJSON string, cb Callback) *Call {
+    ctx, cancel := context.WithCancel(context.Background())
+    go func() { defer cancel(); v, err := dispatch.Call(ctx, cl.c, method, argsJSON); cb.Done(envelope(v, err)) }()
+    return &Call{cancel: cancel}
 }
 type Call struct{ cancel context.CancelFunc }
 func (c *Call) Cancel() { c.cancel() }
-// envelope/jsonError/logf 照搬 hongguo
+// envelope/jsonError/logf 照搬 hongguo core.go:79-102
 ```
 
-**Step 4: 实现 dispatch 方法表（照 hongguo dispatch.go:198-280 模式）**
+**Step 4: 实现 dispatch 方法表（照 hongguo dispatch.go:198-280）**
 
 ```go
-// 约 20 个方法：login/register/me/logout/feed/category/rank/search/posts/post/video/play/
+// 方法表：login/register/me/logout/feed/category/rank/search/posts/post/video/play/
 // comments/commentSend/like/collect/follow/postLike/postCollect/postComments/setBase/
 // decryptCover/rewritePlaylist/fetchSegment
-// 参数解析 arg/args2/oneString 照搬；错误码映射换 huangguo 哨兵错误；
-// 媒体方法返回 SegmentResult → 由 envelope 序列化为 JSON（不直接绑定结构体）。
+// - 参数解析 arg/args2/oneString 照搬
+// - 错误码映射换 huangguo 哨兵错误（ErrAuth/ErrCode/ErrTransport/ErrInvalidBase/...）
+// - 媒体方法返回 SegmentResult / string → 由 envelope 序列化 JSON（不直接绑定结构）
+// - Body []byte 经 JSON 自动 base64，可承载 0x00/0xff
 ```
 
-**Step 5: 运行确认通过**
+**Step 5: 验证**
 
 ```bash
-cd repo/bindings/huangguo/core && go test ./... -v && go vet ./...
+cd repo/bindings/huangguo/core && GOWORK=off go test ./... -v && GOWORK=off go vet ./...
 ```
-Expected: PASS。
+Expected: PASS。补往返测试：Swift/Kotlin 侧解码含 `0x00/0xff`、206、响应头的 JSON（在 Task 9 壳测试里）。
 
 **Step 6: Commit**
 
 ```bash
-git add bindings/huangguo/core && git commit -m "feat(core): gomobile entry with JSON token bridge and dispatch"
+git commit -m "feat(core): gomobile entry, token JSON bridge and dispatch table"
 ```
 
 ---
 
-### Task 9: 移动端壳（iOS Swift + Android Kotlin）
+### Task 9: 移动端壳（iOS + Android 完整工程）
 
 **Files:**
 - Create: `repo/bindings/huangguo/ios/Sources/OpenHuangguo/Client.swift`
 - Create: `repo/bindings/huangguo/ios/Sources/OpenHuangguo/PlayerResourceLoader.swift`
-- Create: `repo/bindings/huangguo/ios/Package.swift`（本地引用 build.sh 产物，用于开发）
+- Create: `repo/bindings/huangguo/ios/OpenhuangguoCore.xcframework（由 build.sh 生成，不提交）`
+- Create: `repo/bindings/huangguo/ios/Package.swift`（本地开发用）
+- Create: `repo/bindings/huangguo/android/settings.gradle.kts`
+- Create: `repo/bindings/huangguo/android/build.gradle.kts`
+- Create: `repo/bindings/huangguo/android/gradle/wrapper/*`（gradlew + jar + properties）
+- Create: `repo/bindings/huangguo/android/src/main/AndroidManifest.xml`
 - Create: `repo/bindings/huangguo/android/src/main/kotlin/dev/openhuangguo/Client.kt`
+- Create: `repo/bindings/huangguo/android/src/main/kotlin/dev/openhuangguo/PlayerDataSourceFactory.kt`
+- Create: `repo/bindings/huangguo/android/src/test/kotlin/dev/openhuangguo/ClientTest.kt`
 
-**Step 1: Swift 壳（callback→async + 播放器资源加载层）**
+**Step 1: iOS 壳（swift build 由 CI 覆盖，本地可选）**
 
 ```swift
-// Client.swift：封装 OpenHuangguoCoreClient 的 Start/callback 为 async 方法
-// SetTokenJSON/GetTokenJSON 接 Keychain（定义协议 TokenStoring，默认 Keychain 实现）
+// Client.swift：封装 Start/callback 为 async；SetTokenJSON/GetTokenJSON 接 Keychain（定义 TokenStoring 协议）
 // PlayerResourceLoader.swift：AVAssetResourceLoaderDelegate
-//   - 把 hg://localhost/seg?u= 还原为上游 URL
-//   - 调 Core 的 rewritePlaylist/fetchSegment/decryptCover（经 JSON）
-//   - 处理 Range：把 AVPlayer 的 requests 转成 reqHeader，回传 Content-Range
-//   - 子清单递归：识别 .m3u8 分片，再次调用 rewritePlaylist
+//   - hg://localhost/seg?u= 还原上游 URL
+//   - 调 Core 的 decryptCover/rewritePlaylist/fetchSegment（经 JSON，解码 base64 body）
+//   - Range：AVPlayer 的 requests 转 reqHeader，回传 Content-Range + status 206
+//   - 子清单：按扩展名 OR MIME OR #EXTM3U 内容判断，递归 rewritePlaylist
 ```
 
-**Step 2: Kotlin 壳**
+**Step 2: Android 完整工程（codex #8：build.sh 依赖这些文件）**
 
 ```kotlin
-// Client.kt：封装 Start/callback 为 suspend/回调；SetTokenJSON/GetTokenJSON 接 Android Keystore
-// 播放器层用 Android MediaDataSource 实现 Range/解密/子清单
+// Client.kt：封装 Start/callback 为 suspend；token 桥接接 Android Keystore
+// PlayerDataSourceFactory.kt：用 Media3 DataSource.Factory 扩展（不是 MediaDataSource——后者是单数据源字节读取，
+//   不负责逐 URI 的 HLS 加载）。实现主清单→子清单→KEY→分片→seek 验证。
+// 包含 Range 请求与 206 响应头处理。
 ```
+Gradle wrapper / Manifest / settings.gradle.kts 参照 `bindings/mobile/android/` 改造包名与产物名。
 
-**Step 3: 本地验证（不需 xcframework）**
+**Step 3: 原生测试**
 
-```bash
-# Swift 壳语法检查（需 Xcode；CI 覆盖）
-cd repo/bindings/huangguo/ios && swift build   # 需 build.sh 先生成 xcframework，本地可跳过
-# Kotlin 编译由 Gradle/CI 覆盖
 ```
-Expected: 本地若无工具链跳过，CI 覆盖。
+- Swift：取消测试 + TokenStore Keychain 往返 + 播放器链路最小验证（CI 需 Xcode/macOS）
+- Kotlin：ClientTest.kt 覆盖取消、token 桥接、播放器 seek（CI Gradle）
+```
 
 **Step 4: Commit**
 
 ```bash
-git add bindings/huangguo/ios bindings/huangguo/android && git commit -m "feat(bindings): iOS and Android shells with player resource loading"
+git commit -m "feat(bindings): iOS and Android shells with full Gradle project and player loading"
 ```
 
 ---
 
-### Task 10: 构建脚本 + 发版流水线 + 独立 Swift 包
+### Task 10: 构建脚本 + 发版 workflow + Package.swift + 回填脚本
 
 **Files:**
-- Create: `repo/bindings/huangguo/build.sh`（复制 hongguo build.sh 改造）
+- Create: `repo/bindings/huangguo/build.sh`
+- Create: `repo/scripts/fix_huangguo_binarytarget.py`
 - Create: `repo/.github/workflows/hg-xcf.yml`
-- Create: `repo/Package.swift`（标准根包，指向本仓库 release asset）
-- Create: `repo/Sources/OpenHuangguo/`（从 bindings/huangguo/ios 壳源码复制）
+- Create: `repo/.github/workflows/ci.yml`
+- Create: `repo/Package.swift`
+- Create/Update: `repo/Sources/OpenHuangguo/`（从 ios 壳源码复制，作为发布产物）
 
-**Step 1: build.sh 改造**
+**Step 1: build.sh（改造 hongguo build.sh）**
 
-```bash
-cp /Users/daubert/Github/openhongguo/bindings/mobile/build.sh repo/bindings/huangguo/build.sh
-# 改造点：
-# - core="$here/core" → SDK/core 模块路径
-# - 产物名 OpenhongguoCore.xcframework → OpenHuangguoCore.xcframework
-# - aar openhongguo-release.aar → huangguo-release.aar
-# - javapkg dev.openhongguo → dev.openhuangguo
-# - 只保留 android + ios target
-# - macOS 部署目标沿用 v12（不跟随上游降 v11）
+```
+- core 路径指向本仓库 sdk/core 模块
+- 产物 OpenHuangguoCore.xcframework / huangguo-release.aar
+- javapkg dev.openhuangguo；只保留 android + ios
+- macOS 目标 v12（不随上游降 v11）
 ```
 
-**Step 2: Package.swift（标准根包）**
+**Step 2: 回填脚本（codex #7：资产名一致 + 精确替换）**
 
-```swift
-// swift-tools-version:5.9
-// name: OpenHuangguo, platforms iOS13/macOS12
-// product .library(name:"OpenHuangguo", targets:["OpenHuangguo"])
-// binaryTarget name:"OpenHuangguoCore", url:"https://github.com/AmatsuZero/openhuangguo-swift/releases/download/hg-xcf-v.../OpenHuangguoCore.xcframework.zip", checksum:...
-// target OpenHuangguo 依赖 OpenHuangguoCore, path Sources/OpenHuangguo
+```python
+# scripts/fix_huangguo_binarytarget.py <tag> <sha256>
+# 1. 只匹配 name == "OpenHuangguoCore" 的 binaryTarget 块
+# 2. URL = .../releases/download/<tag>/OpenHuangguoCore.xcframework.zip（与实际发布资产名一致）
+# 3. checksum 断言在目标块内命中恰好一次；全局其它 binaryTarget 不受影响
+# 4. 用含第二个 binaryTarget 的 fixture 单测验证"其他目标不变"
+NEW_URL = ".../OpenHuangguoCore.xcframework.zip"
+# 禁止简单全局 checksum 替换
 ```
-> 注意：checksum/url 由 `hg-xcf.yml` 回填（在本独立仓库内，改的是自己的 Package.swift，不动 hongguo）。
 
-**Step 3: hg-xcf.yml（独立发版）**
+**Step 3: 发版 tag 时序（codex #6：tag 必须含回填后的 Package.swift）**
+
+```
+1. 先把含改动的 main 推到 openhuangguo-swift
+2. 打 hg-xcf-v* 标签 → 触发 hg-xcf.yml：编译 → 校验 → zip+checksum → 回填本仓库 Package.swift → publish release（资产 OpenHuangguoCore.xcframework.zip）
+3. 回填提交后，在最新 main 上打**消费者源码版本 tag** hg-v*（如 hg-v0.1.0）——SwiftPM 消费者用这个 tag 解析到含正确 URL/checksum 的 Package.swift
+4. hg-xcf-v* 仅作二进制资产 tag，不作为 SwiftPM 版本（与 hongguo 的 xcf-v*/v* 分工一致）
+```
+
+**Step 4: hg-xcf.yml（隔离）**
 
 ```yaml
-# 触发：push tags ['hg-xcf-v*'] + workflow_dispatch
+# push tags ['hg-xcf-v*'] + workflow_dispatch；只在本仓库运行，用本仓库 GITHUB_TOKEN
+# jobs: build（gomobile init + build.sh ios + macOS slice 校验 + zip + shasum）
+#       →回填 Package.swift → commit 到本仓库 main → publish release
+# 不写任何 hongguo 文件；不触发 hongguo 的 release.yml
+```
+
+**Step 5: ci.yml 门禁接通（codex #8：needs + 验证对象含实际发布的 Sources/OpenHuangguo）**
+
+```yaml
 # jobs:
-#   - checkout 本仓库
-#   - setup-go 1.26 + gomobile init
-#   - 编译 macOS slice 校验（照 xcf.yml）
-#   - build.sh ios → OpenHuangguoCore.xcframework
-#   - zip + shasum -a 256
-#   - 回填本仓库 Package.swift 的 binaryTarget url/checksum（脚本仿 fix_xcf_binarytarget.py，但只匹配 OpenHuangguoCore.zip）
-#   - commit Package.swift 到本仓库 main（git checkout -B main origin/main 在本仓库内，不碰 hongguo）
-#   - 打标签 hg-xcf-v*、publish release（softprops/action-gh-release），asset = OpenHuangguoCore.xcframework.zip
+#   go: GOWORK=off 逐 module fmt/vet/test + gen-check
+#   ios: build.sh ios + swift test（验证 Sources/OpenHuangguo 壳）
+#   android: build.sh android + gradle test
+# release job 在 hg-xcf.yml 内 needs 上述验证（或把验证抽成可复用 workflow 被 both 调用）
+# 断言：只有验证 jobs 全绿，hg-xcf-v* 的 release job 才运行
 ```
 
-> 关键：本 workflow 只在 `openhuangguo-swift` 仓库运行，用该仓库 GITHUB_TOKEN，其 release 事件不会触发 hongguo 的 `release.yml`。
-
-**Step 4: CI（本仓库自检）**
-
-```yaml
-# .github/workflows/ci.yml（本仓库）：
-#   - go: 逐 module gofmt/vet/test + go run gen-huangguo 生成一致性
-#   - ios: build.sh ios + swift test
-#   - android: build.sh android + gradle test
-#   - 发布门禁：以上全绿才允许 hg-xcf-v* 发版
-```
-
-**Step 5: 本地确认脚本不破坏 hongguo**
+**Step 6: 本地确认不破坏 hongguo**
 
 ```bash
-# 确认本仓库所有路径都不指向 hongguo 的 Package.swift / fix_xcf_binarytarget.py / xcf.yml
-grep -R 'openhongguo' repo/ || echo "OK: no hongguo refs"
+cd repo && grep -R 'openhongguo\|beilunyang' . --exclude-dir=.git || echo "OK: no hongguo refs"
 ```
 
-**Step 6: Commit**
+**Step 7: Commit**
 
 ```bash
-git add .github bindings/huangguo/build.sh Package.swift Sources && git commit -m "build: standalone build, release workflow and Swift package"
+git commit -m "build: standalone build, release workflow, Package.swift and precise backfill script"
 ```
 
 ---
 
-### Task 11: fixture 契约测试与发布前验证
+### Task 11: 全量验证门禁
 
-**Files:**
-- Create: `repo/bindings/huangguo/sdk/testdata/*.json`（HGhub 真实响应样本）
-- Create: `repo/bindings/huangguo/sdk/contract_test.go`
-
-**Step 1: 准备 fixture**
+**Step 1: 运行全部本地检查**
 
 ```bash
-# 从 HGhub 的 testdata / 实际响应采集：feed/video/play/comments/rank/search/posts/me
-# 放到 bindings/huangguo/sdk/testdata/，脱敏 token/userinfo
+cd repo
+make fmt && make vet && make test && make gen-check
+# 生成一致性：git diff --exit-code（含 Task7 的 Types.swift/Types.kt）
 ```
 
-**Step 2: 写契约测试**
+**Step 2: 发布前清单（codex #13 闭环）**
 
-```go
-func TestFixturesParse(t *testing.T) {
-    // 每个 fixture 用 c.do 的解析路径跑通，断言关键字段路径与 JSON 类型存在
-    // 对照 src/types.ts 字段
-}
+```
+- 黄果独立 Go 检查全绿
+- 生成文件无 drift
+- gomobile 双端构建（CI）
+- Swift/Kotlin 壳编译 + 取消测试 + 播放器链路最小验证（CI）
+- token 持久化失败边界测试（Clear/Save 失败返回错误，不谎称成功）
+- SegmentResult 含 0x00/0xff、206、响应头的 JSON 往返测试
 ```
 
-**Step 3: 运行全量验证**
+**Step 3: Commit（若验证过程有修复）**
 
 ```bash
-cd repo/bindings/huangguo/sdk && go test ./... -v
-cd repo/bindings/huangguo/core && go test ./... -v
-cd repo/bindings/huangguo/gen-huangguo && go test ./... -v
-# 生成一致性：go run ./bindings/huangguo/gen-huangguo && git diff --exit-code
-```
-Expected: 全绿；生成文件无 drift。
-
-**Step 4: Commit**
-
-```bash
-git add . && git commit -m "test: HGhub fixtures and full validation gate"
+git commit -am "test: full validation gate fixes" || echo "no changes"
 ```
 
 ---
 
 ## 完成后交接
 
-全部 Task 通过后：
-1. 本地 `go test ./...` / `go vet` / gofmt 全绿；生成文件无 drift。
+1. 本地 `make all` 全绿；生成文件无 drift。
 2. xcframework 编译/打包/发版由 CI（`hg-xcf.yml`）执行，本地不做。
-3. 发版标签顺序（独立仓库）：先把含改动的 main 推到 `openhuangguo-swift`，再打 `hg-xcf-v*` 触发构建与 release；消费者用 `Package.swift` 的 binaryTarget 指向 release。
-4. 若需推送当前 fork 的设计/计划文档，单独请求用户授权（按惯例发版/推送单独确认）。
+3. 发版时序（独立仓库）：推 main → 打 `hg-xcf-v*` 触发构建+release → 回填后打 `hg-v*` 消费者 tag。
+4. 若需推送当前 fork 的设计/计划文档，单独请求用户授权（发版/推送单独确认）。
+5. 整个实现**不触碰 hongguo 任何文件**；完成后用 `git -C 当前fork status` 确认 fork 除文档外无改动。
