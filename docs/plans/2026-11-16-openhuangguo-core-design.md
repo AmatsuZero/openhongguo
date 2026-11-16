@@ -73,7 +73,7 @@ AmatsuZero/openhuangguo-swift/            # 独立分发仓库（Go 源码 + Swi
 openhongguo（源仓库）：仅保留 bindings/huangguo 的 Go 源码镜像/或迁入独立仓库后删除，不改任何 hongguo 文件。
 ```
 
-**Module path 独立前缀**（codex #11）：既然不复用 hongguo 的 `bindings/internal/schema`（schema 依赖限定在 `gen-huangguo`，且生成器可复制 schema 源码），module path 可用独立前缀，**不受 `github.com/beilunyang/openhongguo/...` 约束**——这样仓库/模块彻底独立。若决定仍 import hongguo schema，则必须保留 `github.com/beilunyang/openhongguo/...` 前缀。两者二选一，在写第一行 go.mod 前定死（见"复核处理记录 #11"）。
+**Module path 用独立前缀**（codex #11，已定）：模块放独立仓库 `github.com/AmatsuZero/openhuangguo-swift`，sdk 与 core 分别为 `.../bindings/huangguo/sdk`、`.../bindings/huangguo/core`。**不复用 hongguo 的 `bindings/internal/schema`**——把 schema 源码复制进 `gen-huangguo` 并改造（见绑定层），因此不受 `github.com/beilunyang/openhongguo/...` 前缀约束，仓库/模块彻底独立。这是唯一方案，不再二选一。
 
 依赖与 replace 归属（写在使用方 module 的 go.mod，下游不继承）：
 
@@ -86,12 +86,13 @@ openhongguo（源仓库）：仅保留 bindings/huangguo 的 Go 源码镜像/或
 
 - **client.go**：`Client` 持有 `transport` / `tokenStore` / `base` / `credTrustOrigins` / `clock` / `logger`。`NewClient(opts)` 校验依赖、定默认值（base = `https://huangguoai.com`），不发请求。业务方法统一 `ctx` 打头。重试循环、退避抖动、`sleepContext` 照搬 hongguo `client.go:122-174`，判定按 HGhub。
 - **edge.go**：唯一线上出口。封 `{method,path,body,content_type}` POST 到 `{base}/api/edge/request`。响应按上面"精确语义"分别处理 HTTP 状态、业务 status、空串/null/裸 `{}`/`data:{}`。**edge 首版禁止自动重定向**（`CheckRedirect` 返回 `http.ErrUseLastResponse`）；游客迁移若日后支持，显式有限跳转 + 重新封装。
-- **auth.go / store.go**：`TokenStore` 持久化 `{origin, token, generation}`：
-  - gomobile 可绑定签名（全简单类型）：`Load() (origin, token string, generation int64, err error)`、`Save(origin, token string, generation int64) error`、`Clear() error`。宿主实现须**线程安全**（任意 Go goroutine 可调用）；错误以 JSON envelope 传回。
+- **auth.go / store.go**：分两层，避免把内部接口与 gomobile 可绑定签名混为一谈（codex #13）：
+  - **内部 `TokenStore` 接口**（Go SDK 内部用，返回值不受 gomobile 限制）：`Load() (Session, error)`，其中 `Session{Origin, Token string; Generation int64}`；`Save(Session) error`；`Clear() error`。
+  - **gomobile 绑定边界**：Bindings 不直接暴露 `TokenStore` 接口（gomobile 绑定方法不支持多返回值，且 Go interface 由宿主实现有边界）。改为在 `core` 层提供一个**可绑定的 token 桥接类型**：`SetTokenJSON(json string) error` / `GetTokenJSON() (string, error)`（单返回值 + error，gomobile 可绑定），JSON 承载 `{origin,token,generation}`；原生层用它把 Keychain/Keystore 读写桥接到内部 store。宿主实现须**线程安全**（任意 Go goroutine 可调用）。
   - **origin 绑定**：拒绝以另一 base 重启时误用旧 token（HGhub `session.rs:8-15,76-78`）。
-  - **generation**：切 base / 登出即递增（`Clear/Save` 之前递增），旧 generation 的登录响应禁止提交（对齐 `api.rs:335-338`）。请求原子读取 origin/token 快照。
-  - **失败语义**：`Clear` 无论磁盘成功与否，立即清空内存 token（当前进程不再使用），失败返回错误供记录；登出/切域名不因 Clear 失败回滚，重启后由 origin+generation 校验兜底拒绝旧 token。`Save` 失败时登录响应仍返回成功（内存 token 可用）并记录警告，不伪装成登录失败。
-  - 文件实现：权限 0600、tmp+rename 原子写、明确错误传播。移动端默认内存 store，明确 Keychain/Keystore 接入契约。
+  - **generation**：切 base / 登出即递增，旧 generation 的登录响应禁止提交（对齐 `api.rs:335-338`）。请求原子读取 origin/token 快照。
+  - **失败语义（明确跨重启保证的边界）**：`Clear` 无论持久化成功与否，立即清空内存 token（当前进程不再使用），失败返回错误供记录；登出/切域名不因 Clear 失败回滚。**若 Clear 持久化失败，磁盘仍存旧 token+旧 generation，重启会一并加载——故首版明确：持久化失败时不保证跨重启的退出生效**，须由宿主把 Clear 失败视为必须重试/上报的硬错误（移动端 Keychain 实现删除失败即报错，绝不静默成功）。不能声称"靠 origin+generation 兜底拒绝重启后的旧 token"——那只在 Clear 持久化成功时成立。
+  - **文件实现**：权限 0600、tmp+rename 原子写、明确错误传播；Clear 通过写入"已撤销"标记或删除文件实现，删除失败必须返回错误。移动端默认内存 store，Keychain/Keystore 接入走上面的 token 桥接。
   - SetBase 入口在 SDK、dispatch、Swift/Kotlin 壳三层都定义清楚。
 - **凭据目标信任策略**：base 规范化为 HTTPS + 纯 origin（无 userinfo/path/query/fragment）；默认固定**凭据信任名单**（`huangguoai.com` / `huangguoai.ai`）。镜像仅供游客浏览，不得向其发送登录密码或 Bearer。token 由 edge 显式注入，**媒体请求不自动带鉴权头**。
 - **model/**：照 `src/types.ts` 建强类型，JSON tag 对齐 TS。`Paged<T>` 实例化为具名类型（`VideoCardPage`/`CommentPage`/`PostPage`），`Detail.counts/author`、`PlayInfo.streams` 为具名 struct——满足 AST 解析与生成。
@@ -108,7 +109,7 @@ Go Core（xcframework/AAR 内的部分）只提供**无状态纯函数**；**播
 
 - `DecryptCover([]byte) ([]byte, error)`：AES-128-CBC，key/IV 为 `media.rs:26-27` 硬编码常量；明文图片直接透传（`media.rs:106-118`），仅密文解密；条件去 padding（`media.rs:77-84`，无效 padding 原样保留）。
 - `RewritePlaylist(upstreamURL, localScheme, host, text string) string`：显式保留**上游清单完整 URL**作为所有相对 URI 的解析基准（解决 codex #7 的基准不清）。URI 改写为可逆的本地协议映射（上游绝对 URL 放 query，如 `?u=`，宿主据此还原）。首版行为矩阵对齐 `media.rs`：BOM、带逗号的引号属性、`CONTENT-STEERING` 删除、`DATERANGE` 外部资源清理、KEY/MAP/MEDIA/SESSION-KEY/PART/PRELOAD-HINT 与分片行改写、**子清单再次识别并改写**（`media.rs:315-330`）。
-- `FetchSegment(ctx, url string, header http.Header) (status int, ctype string, body []byte, err error)`：用共享 transport 拉取分片/KEY，**接受 Range 请求头并回传 206/Content-Range 等状态**，由宿主资源加载层据此应答播放器；独立大小上限，支持取消。Range 的宿主↔Core 传递契约即此签名。
+- `FetchSegment(ctx, url string, reqHeader map[string]string) (SegmentResult, error)`：接受 Range 等请求头（用 `map[string]string` 而非 `http.Header`，便于绑定序列化）；返回结构 `SegmentResult{Status int; Headers map[string]string; Body []byte}`——**Headers 字段承载 Content-Range / Accept-Ranges / Content-Length 等响应头**，宿主资源加载层据此应答播放器（含 206 语义）。`map[string]string` 与结构体字段都是 gomobile 可序列化类型。独立大小上限，支持取消。Range 的宿主↔Core 契约即此签名与结构。
 
 ## 绑定层
 
@@ -152,7 +153,6 @@ Go Core（xcframework/AAR 内的部分）只提供**无状态纯函数**；**播
 - **HGhub 接口稳定性**：上游不保证接口持续可用；model 解析容忍字段缺失（指针/零值）。
 - **账号凭据安全**：默认内存 store，移动端 Keychain/Keystore；文件 0600/原子写；日志与错误绝不输出 token 与代理凭据。
 - **媒体宿主层**：由 App 实现，Go Core 只给纯函数；首版真实播放器验证后再定是否长期不需要本地 server。
-- **module path 二选一**：写第一行 go.mod 前，定"独立前缀（schema 复制进 gen）/ beilunyang 前缀（直接 import schema）"。推荐独立前缀。
 - **Go SDK 外部消费**：首版只经绑定产物消费，不支持外部 `go get`；如需则另设嵌套模块标签与最小消费者验证。
 
 ## 复核处理记录（第二轮 codex review 13 条）
@@ -160,10 +160,10 @@ Go Core（xcframework/AAR 内的部分）只提供**无状态纯函数**；**播
 - 已解决：#1 go.work、#2 schema、#3 Swift 包入口、#4 凭据信任、#8 媒体行为矩阵。
 - 本版收紧：
   - #5 补媒体重定向策略（最多 5 跳、逐跳检查、禁降级）。
-  - #6 明确 Clear/Save 失败语义 + generation 先递增 + gomobile TokenStore 签名/线程约定。
-  - #7 明确职责边界（纯函数在 Core、资源加载层在壳）、`RewritePlaylist` 保留上游完整 URL 作解析基准、`FetchSegment` 的 Range 契约。
+  - #6 明确 Clear/Save 失败语义：generation 先递增；持久化 Clear 失败不保证跨重启退出，宿主须视为硬错误重试/上报；gomobile 可绑定 token 桥接用单返回值 JSON 签名。
+  - #7 明确职责边界（纯函数在 Core、资源加载层在壳）、`RewritePlaylist` 保留上游完整 URL 作解析基准；`FetchSegment` 用 `SegmentResult{Status,Headers,Body}` 回传 Content-Range 等响应头（map[string]string + 结构体，gomobile 可序列化）。
   - #9 明确代理优先级、NO_PROXY 对显式代理、SOCKS、显式直连的**选择**。
   - #10 纠正响应语义：空串/null 成功，裸 `{}` 失败，`data:{}` 属成功信封。
   - #11 schema 依赖限定到 gen（构建期），SDK 无根模块依赖，core 不需补 replace；首版不支持外部 go get。
   - #12 明确二进制 release 也发布到独立仓库 `openhuangguo-swift`，源仓库 `release.yml` 不会收到其 `release.published`。
-  - #13 补 TokenStore gomobile 签名、错误/线程约定、文件 0600/原子写、发布门禁。
+  - #13 内部 TokenStore 用多返回值 Go 接口，gomobile 边界用单返回值 `SetTokenJSON/GetTokenJSON` 桥接；错误/线程约定、文件 0600/原子写、发布门禁。
