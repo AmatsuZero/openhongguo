@@ -983,9 +983,10 @@ func LoadModelOnly(root string) (*Schema, error) {
 package main
 func TestGenerateHuangguoTypes(t *testing.T) {
     // 测试在 gen 模块目录 bindings/huangguo/gen-huangguo 运行：
-    //   仓库根 = ../../..；schema 的 huangguo 根 = <repo>/bindings/huangguo = ../..
-    huangguoRoot := "../.."
-    s, err := schema.LoadModelOnly(huangguoRoot) // 内部拼 <root>/sdk/model
+    //   schema 的 huangguo 根 = <repo>/bindings/huangguo = ..（LoadModelOnly 内部拼 <root>/sdk/model）
+    //   注意：仓库根才是 ../../..，那是 main.go 的 --repo-root 传值，不是这里的参数
+    huangguoRoot := ".."
+    s, err := schema.LoadModelOnly(huangguoRoot) // 内部拼 <root>/sdk/model = bindings/huangguo/sdk/model
     if err != nil { t.Fatal(err) }
     swift := swiftTypes(s); kotlin := kotlinTypes(s)
     for _, want := range []string{"struct VideoCard", "struct Detail", "struct PlayInfo"} {
