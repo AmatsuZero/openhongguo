@@ -109,11 +109,11 @@ Go Core（xcframework/AAR 内的部分）只提供**无状态纯函数**；**播
 
 - `DecryptCover([]byte) ([]byte, error)`：AES-128-CBC，key/IV 为 `media.rs:26-27` 硬编码常量；明文图片直接透传（`media.rs:106-118`），仅密文解密；条件去 padding（`media.rs:77-84`，无效 padding 原样保留）。
 - `RewritePlaylist(upstreamURL, localScheme, host, text string) string`：显式保留**上游清单完整 URL**作为所有相对 URI 的解析基准（解决 codex #7 的基准不清）。URI 改写为可逆的本地协议映射（上游绝对 URL 放 query，如 `?u=`，宿主据此还原）。首版行为矩阵对齐 `media.rs`：BOM、带逗号的引号属性、`CONTENT-STEERING` 删除、`DATERANGE` 外部资源清理、KEY/MAP/MEDIA/SESSION-KEY/PART/PRELOAD-HINT 与分片行改写、**子清单再次识别并改写**（`media.rs:315-330`）。
-- `FetchSegment(ctx, url string, reqHeader map[string]string) (SegmentResult, error)`：接受 Range 等请求头（用 `map[string]string` 而非 `http.Header`，便于绑定序列化）；返回结构 `SegmentResult{Status int; Headers map[string]string; Body []byte}`——**Headers 字段承载 Content-Range / Accept-Ranges / Content-Length 等响应头**，宿主资源加载层据此应答播放器（含 206 语义）。`map[string]string` 与结构体字段都是 gomobile 可序列化类型。独立大小上限，支持取消。Range 的宿主↔Core 契约即此签名与结构。
+- `FetchSegment(ctx, url string, reqHeader map[string]string) (SegmentResult, error)`：接受 Range 等请求头；**这是 Go SDK 内部签名**。`SegmentResult{Status int; Headers map[string]string; Body []byte}` 的 `Headers` 承载 Content-Range / Accept-Ranges / Content-Length 等响应头，供宿主资源加载层应答播放器（含 206 语义）。**该结构体/map 不直接 gomobile 绑定**——Core 通过既有 `Client.Start(method,argsJSON,callback)` 的 JSON 通道把它序列化传出（与 hongguo core.go 一致：gomobile 只导简单类型 + interface）。独立大小上限，支持取消。Range 的宿主↔Core 契约即此 JSON 结构。
 
 ## 绑定层
 
-- **core/core.go**：照搬 `bindings/mobile/core/core.go:37-102` 的 gomobile 模板——`Client.Start`、`Call.Cancel`、`envelope/jsonError/logf`。**构造器不能原样搬**（耦合 `adapters.NewClient/profilePath`）：huangguo 版直接接收 `TokenStore` 与 config，不走 `adapters.NewClient`。configJSON 带 `base`/`proxy`/`credTrustOrigins`；TokenStore 由原生层注入（签名见上）。
+- **core/core.go**：照搬 `bindings/mobile/core/core.go:37-102` 的 gomobile 模板——`Client.Start`、`Call.Cancel`、`envelope/jsonError/logf`。**构造器不能原样搬**（耦合 `adapters.NewClient/profilePath`）：huangguo 版构造器只收 `configJSON` 与 logger，内部建 SDK Client；不走 `adapters.NewClient`。configJSON 带 `base`/`proxy`/`credTrustOrigins`。**TokenStore 不通过构造器注入 Go interface**——原生层通过可绑定的 `SetTokenJSON/GetTokenJSON` 桥接（单返回值 + error，见 SDK 内核节），把 Keychain/Keystore 读写接到内部 store；所有复杂数据（含 `SegmentResult`）一律走 `Start`/callback 的 JSON 通道，不直接 gomobile 绑定。
 - **core/dispatch/**：为 huangguo 重写方法表（约 20 个方法），照搬 `dispatch.go:198-280` 的参数解析、error envelope、`ErrorCodes` 结构；错误码换 huangguo 哨兵错误；补 `setBase`。
 - **gen-huangguo/**（codex #2）：**不能零改动复用** schema——`schema.go:23-26` 硬编码 hongguo `QueryTypes` 且 `:133` 要求全存在，跳过泛型、不支持匿名结构体字段。方案：把 schema 作为**构建期依赖复制进 gen-huangguo**（不进 SDK 运行时），设黄果 `QueryTypes`，分页实例/嵌套对象用具名 Go 类型；不改 hongguo 源文件。最小 schema→Swift/Kotlin 生成验证作为门禁。
 - **移动端壳**：`bindings/huangguo/ios`（SwiftPM + `Client.swift` 封装 callback→async + **播放器资源加载层**：把 Core 的 URI 映射/Range/解密接到 AVPlayer）、`bindings/huangguo/android`（Gradle + `Client.kt`）。壳与独立 Swift 分发仓库的关系：壳源码复制到 `openhuangguo-swift/Sources/OpenHuangguo` 随标准 `Package.swift` 发布。
@@ -161,9 +161,9 @@ Go Core（xcframework/AAR 内的部分）只提供**无状态纯函数**；**播
 - 本版收紧：
   - #5 补媒体重定向策略（最多 5 跳、逐跳检查、禁降级）。
   - #6 明确 Clear/Save 失败语义：generation 先递增；持久化 Clear 失败不保证跨重启退出，宿主须视为硬错误重试/上报；gomobile 可绑定 token 桥接用单返回值 JSON 签名。
-  - #7 明确职责边界（纯函数在 Core、资源加载层在壳）、`RewritePlaylist` 保留上游完整 URL 作解析基准；`FetchSegment` 用 `SegmentResult{Status,Headers,Body}` 回传 Content-Range 等响应头（map[string]string + 结构体，gomobile 可序列化）。
+  - #7 明确职责边界（纯函数在 Core、资源加载层在壳）、`RewritePlaylist` 保留上游完整 URL 作解析基准；`FetchSegment` 用 `SegmentResult{Status,Headers,Body}` 回传 Content-Range 等响应头，经 Core 的 `Start`/callback JSON 通道传出（不直接绑定结构体）。
   - #9 明确代理优先级、NO_PROXY 对显式代理、SOCKS、显式直连的**选择**。
   - #10 纠正响应语义：空串/null 成功，裸 `{}` 失败，`data:{}` 属成功信封。
   - #11 schema 依赖限定到 gen（构建期），SDK 无根模块依赖，core 不需补 replace；首版不支持外部 go get。
   - #12 明确二进制 release 也发布到独立仓库 `openhuangguo-swift`，源仓库 `release.yml` 不会收到其 `release.published`。
-  - #13 内部 TokenStore 用多返回值 Go 接口，gomobile 边界用单返回值 `SetTokenJSON/GetTokenJSON` 桥接；错误/线程约定、文件 0600/原子写、发布门禁。
+  - #13 内部 TokenStore 用多返回值 Go 接口，gomobile 边界用单返回值 `SetTokenJSON/GetTokenJSON` 桥接（构造器只收 configJSON+logger，不注入接口）；错误/线程约定、文件 0600/原子写、发布门禁。
