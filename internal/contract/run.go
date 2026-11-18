@@ -329,8 +329,13 @@ func playSeries(ctx context.Context, client *sdk.Client, rec *recorder, cfg Conf
 		return checks
 	}
 
-	rec.forget(protocol.PathPlaybackV5)
-	rec.forget(protocol.PathPlayback)
+	// 每次尝试前清空两条播放路径，确保最后只比对本次尝试的响应。换设备后
+	// 若 V5 成功，残留的上一次旧接口空响应会让下面的 playbackPath 误选旧接口。
+	forgetPlayback := func() {
+		rec.forget(protocol.PathPlaybackV5)
+		rec.forget(protocol.PathPlayback)
+	}
+	forgetPlayback()
 	pb, err := client.ResolvePlayback(ctx, page.Items[0].ID, sdk.PlaybackOptions{})
 	// Since 2026-10-29 the service answers each anonymous device with a model
 	// about once, and even a new device's first request is not certain, so
@@ -339,6 +344,7 @@ func playSeries(ctx context.Context, client *sdk.Client, rec *recorder, cfg Conf
 		if err = client.ResetDevice(ctx); err != nil {
 			break
 		}
+		forgetPlayback()
 		pb, err = client.ResolvePlayback(ctx, page.Items[0].ID, sdk.PlaybackOptions{})
 	}
 	if errors.Is(err, sdk.ErrDRMProtected) && pb != nil {

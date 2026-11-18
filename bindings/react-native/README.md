@@ -6,9 +6,9 @@ SDK 用匿名设备发送所有请求。SDK 不需要登录。
 
 原生层是 gomobile 编译的 Go SDK，通过 Expo Modules 接入。所以 SDK 的行为与 Go SDK 相同，接口与 Node.js SDK 相同。
 
-> **免责声明**：本仓库的所有内容仅供学习和参考之用，禁止用于商业用途。使用前请阅读[完整的免责声明](https://github.com/beilunyang/openhongguo#免责声明)。使用本仓库的内容即表示您同意其所有条款和条件。
+> **免责声明**：本仓库的所有内容仅供学习和参考之用，禁止用于商业用途。使用前请阅读[完整的免责声明](https://github.com/AmatsuZero/openhongguo#免责声明)。使用本仓库的内容即表示您同意其所有条款和条件。
 
-术语的含义见[根目录 README 的术语表](https://github.com/beilunyang/openhongguo#术语)。
+术语的含义见[根目录 README 的术语表](https://github.com/AmatsuZero/openhongguo#术语)。
 
 ## 快速上手
 
@@ -59,7 +59,7 @@ console.log(playback.streams.map((s) => `${s.definition} ${s.url}`));
 
 ## 接口
 
-接口与 Node.js SDK `openhongguo` 相同，见 [bindings/node/README.md](https://github.com/beilunyang/openhongguo/tree/main/bindings/node#接口)。
+接口与 Node.js SDK `openhongguo` 相同，见 [bindings/node/README.md](https://github.com/AmatsuZero/openhongguo/tree/main/bindings/node#接口)。
 
 | 项目 | 说明 |
 |---|---|
@@ -82,7 +82,7 @@ console.log(playback.streams.map((s) => `${s.definition} ${s.url}`));
 
 如果要从源码使用这个包，执行以下步骤：
 
-1. 编译 Go core，并把它复制到 `android/` 和 `ios/`。构建需要 Go 1.26 或更高版本和 gomobile，环境要求见 [bindings/mobile/README.md](https://github.com/beilunyang/openhongguo/tree/main/bindings/mobile#构建)：
+1. 编译 Go core，并把它复制到 `android/` 和 `ios/`。构建需要 Go 1.26 或更高版本和 gomobile，环境要求见 [bindings/mobile/README.md](https://github.com/AmatsuZero/openhongguo/tree/main/bindings/mobile#构建)：
 
    ```sh
    ../mobile/build.sh react-native

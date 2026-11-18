@@ -243,3 +243,48 @@ func TestRunPlaybackRetryBudgetIsBounded(t *testing.T) {
 		t.Fatal("no playback request was made")
 	}
 }
+
+// flakyPlaybackTransport returns empty playback responses for the first
+// device (both V5 attempts and the legacy fallback), then delegates to the
+// fixtures so that the next device succeeds. This reproduces the case where
+// a device reset turns an empty playback into a success.
+type flakyPlaybackTransport struct {
+	inner         *fixtureTransport
+	playbackCalls int
+}
+
+func (f *flakyPlaybackTransport) Do(ctx context.Context, req *sdk.Request) (*sdk.Response, error) {
+	u, err := url.Parse(req.URL)
+	if err != nil {
+		return nil, err
+	}
+	if u.Path == protocol.PathPlaybackV5 || u.Path == protocol.PathPlayback {
+		f.playbackCalls++
+		// The first ResolvePlayback: two V5 attempts + one legacy, all empty.
+		if f.playbackCalls <= 3 {
+			return &sdk.Response{StatusCode: 200, Body: nil}, nil
+		}
+	}
+	return f.inner.Do(ctx, req)
+}
+
+// TestPlaybackAfterDeviceResetComparesSuccessfulResponse guards that the
+// recorder forgets both playback paths before each attempt. Otherwise the
+// first device's empty legacy response lingers, the successful V5 response
+// after a device reset is ignored, and the check compares an empty body
+// against the fixture ("live response is not JSON").
+func TestPlaybackAfterDeviceResetComparesSuccessfulResponse(t *testing.T) {
+	tr := &flakyPlaybackTransport{inner: &fixtureTransport{t: t}}
+	checks := Run(context.Background(), Config{
+		Transport: tr, Profiles: memstore.New(), FixtureDir: fixtureDir, Query: "Fixture",
+	})
+	var playback Check
+	for _, c := range checks {
+		if c.Name == "series playback" {
+			playback = c
+		}
+	}
+	if !playback.OK() {
+		t.Fatalf("playback after device reset: err=%v drifts=%v", playback.Err, playback.Drifts)
+	}
+}

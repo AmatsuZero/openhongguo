@@ -16,7 +16,7 @@ openhongguo-cli 是 openhongguo 的命令行工具，命令名是 `ohg`。它可
 
    | 方式 | 说明 |
    |---|---|
-   | 下载二进制 | 从 [GitHub Releases](https://github.com/beilunyang/openhongguo/releases) 下载对应平台的 `openhongguo-cli_*` 压缩包。macOS 上解压后执行一次 `xattr -d com.apple.quarantine ohg` |
+   | 下载二进制 | 从 [GitHub Releases](https://github.com/AmatsuZero/openhongguo/releases) 下载对应平台的 `openhongguo-cli_*` 压缩包。macOS 上解压后执行一次 `xattr -d com.apple.quarantine ohg` |
    | `go install` | `go install github.com/beilunyang/openhongguo/cmd/ohg@latest`。需要 Go 1.22 或更高版本 |
    | 从源码构建 | `go build -o bin/ohg ./cmd/ohg`。需要 Go 1.22 或更高版本 |
 
