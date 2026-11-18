@@ -178,13 +178,15 @@ export async function createClient(options = {}) {
     webOrigin,
     retryAttempts = 3,
     device,
+    signerUrl,
+    signerToken,
   } = options;
   const store = typeof profile === 'string' ? fileProfileStore(profile) : profile;
   const res = rt.newClient({
     transport,
     profile: store,
     log,
-    options: JSON.stringify({ apiOrigin, registerOrigin, distributionOrigin, webOrigin, retryAttempts, device }),
+    options: JSON.stringify({ apiOrigin, registerOrigin, distributionOrigin, webOrigin, retryAttempts, device, signerUrl, signerToken }),
   });
   if (res.error) throw new OpenhongguoError(res.error);
   return new Client(res.call);

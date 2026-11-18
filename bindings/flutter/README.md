@@ -112,13 +112,13 @@ flutter pub add openhongguo
 | 方法 | 作用 |
 |---|---|
 | `person(userId)` | 加载一位演员或一个角色的主页 |
-| `personWorks(userId, cursor)` | 加载一位演员参演的短剧，一次一页（主页上的作品 › 剧作） |
+| `personWorks(userId, cursor)` | 加载一位演员参演的短剧，一次一页（主页上的剧作） |
 
 ### 播放与设备
 
 | 方法 | 作用 |
 |---|---|
-| `resolvePlayback(episodeId)` | 加载一集的播放模型：各清晰度的地址、编码和码率 |
+| `resolvePlayback(episodeId)` | 加载一集的各清晰度地址、编码和码率 |
 | `resetDevice()` | 丢弃当前匿名设备，并注册一台新设备 |
 <!-- /gen:methods -->
 
@@ -197,7 +197,7 @@ try {
 |---|---|---|
 | `INVALID_OPTIONS` | 客户端的设置或调用参数无效 | 否 |
 | `PROFILE_NOT_FOUND` | 还没有保存过设备档案 | 否 |
-| `SIGNER_UNAVAILABLE` | 请求需要签名，而客户端没有可用的签名器 | 否 |
+| `SIGNER_UNAVAILABLE` | 请求需要签名，而客户端没有可用的签名器，或者签名服务不可用 | 否 |
 | `AUTHENTICATION_REQUIRED` | 内容需要登录才能访问，匿名客户端无法继续 | 否 |
 | `NOT_PROTECTED` | 为未加密的播放模型请求了内容密钥 | 否 |
 | `DRM_PROTECTED` | 分集是加密的，需要内容密钥才能解密 | 否 |

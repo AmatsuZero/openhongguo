@@ -49,6 +49,13 @@ data class ClientOptions(
     val retryAttempts: Int = 3,
     /** 新注册设备自称的机型；为空的字段取默认值（小米 14）。 */
     val device: Device? = null,
+    /**
+     * openhongguo-signer 签名服务的地址，如 "https://signer.example.com"。
+     * 为空时用内置的签名实现；设置后，请求签名交给签名服务。
+     */
+    val signerUrl: String? = null,
+    /** 签名服务的 token，服务端设置了 SIGNER_TOKEN 时才需要。 */
+    val signerToken: String? = null,
     /** 接收诊断日志，在 SDK 的线程里调用；日志里的 URL 已经脱敏。 */
     val logger: ((String) -> Unit)? = null,
 ) {
@@ -59,6 +66,8 @@ data class ClientOptions(
         put("webOrigin", webOrigin)
         put("retryAttempts", retryAttempts)
         put("device", device?.toJson())
+        put("signerUrl", signerUrl)
+        put("signerToken", signerToken)
     }
 }
 
