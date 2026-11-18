@@ -168,6 +168,8 @@ if (playback.protected) {
 | `device` | 新匿名设备的机型。空字段使用默认值（小米 14） |
 | `log` | 接收诊断日志的函数。日志中的 URL 已经脱敏 |
 | `apiOrigin`、`registerOrigin`、`distributionOrigin` | 接口地址。默认值与 App 相同 |
+| `signerUrl` | openhongguo-signer 签名服务的地址，例如 `https://signer.example.com`。不填时用内置的签名实现；填了以后，请求签名交给签名服务，不可用时报 `SIGNER_UNAVAILABLE`，不会回退到内置签名。见[选择签名方式](https://github.com/AmatsuZero/openhongguo#选择签名方式) |
+| `signerToken` | 签名服务的 token。服务端设置了 `SIGNER_TOKEN` 时才需要 |
 
 ### 设备档案
 

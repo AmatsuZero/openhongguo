@@ -128,6 +128,7 @@ client, err := adapters.NewClient("anonymous.json", sdk.Options{
 | `DeviceResets` | 设备被拒（`ErrDeviceRejected`）或播放返回空结果（`ErrAnonymousLimited`）时，一次调用最多更换几台匿名设备 | 2（其他语言的 SDK 用 `deviceResets`，含义相同；0 表示关闭） |
 | `Logger` | 接收诊断日志 | 不记录 |
 | `APIOrigin`、`RegisterOrigin`、`DistributionOrigin` | 接口地址 | 与 App 相同 |
+| `SignerURL`、`SignerToken` | 签名服务的地址和 token，见[选择签名方式](#选择签名方式) | 空，用内置的 Go 实现签名 |
 
 如果不用 `adapters`，直接调用 `sdk.NewClient`。这时 `Transport` 和 `ProfileStore` 是必填的。
 
@@ -310,6 +311,56 @@ type Transport interface {
 > - 请求 URL 的查询参数包含设备 ID。记录日志前先脱敏。
 
 `httptransport.New()` 是默认实现。`SetLogger` 把每个请求的方法、脱敏后的 URL 和状态码写入日志。
+
+### 选择签名方式
+
+需要签名的请求有两种签名方式：
+
+| 方式 | 怎样开启 | 适用场景 |
+|---|---|---|
+| 内置签名（默认） | 不设 `SignerURL` | 平时使用。纯 Go 实现，不依赖外部服务 |
+| 签名服务 | 设置 `SignerURL` | 内置签名失效时（例如 App 升级后签名算法变化）。需要先部署 [openhongguo-signer](https://github.com/beilunyang/openhongguo/tree/main/signer)，镜像是 Docker Hub 上的 [`beilunyang/openhongguo-signer`](https://hub.docker.com/r/beilunyang/openhongguo-signer) |
+
+```go
+// 内置签名
+client, err := adapters.NewClient("anonymous.json", sdk.Options{})
+
+// 签名服务
+client, err := adapters.NewClient("anonymous.json", sdk.Options{
+	SignerURL:   "https://signer.example.com",
+	SignerToken: token, // 服务端没有设置 SIGNER_TOKEN 时省略
+})
+```
+
+各语言的写法：
+
+| 语言 | 内置签名 | 签名服务 |
+|---|---|---|
+| Go | 不设 `SignerURL` | `sdk.Options{SignerURL: "...", SignerToken: "..."}` |
+| Node.js、React Native | 不传 `signerUrl` | `createClient({ signerUrl: '...', signerToken: '...' })` |
+| Flutter、Swift、Kotlin | 不传 `signerUrl` | `ClientOptions(signerUrl: ..., signerToken: ...)` |
+| 命令行 `ohg` | 不设 `OHG_SIGNER_URL` | `OHG_SIGNER_URL=... OHG_SIGNER_TOKEN=... ohg ...`，见[命令行文档](docs/cli.md#配置) |
+
+> **注意**：
+>
+> - 签名方式在创建客户端时确定，之后不能切换。
+> - 只设 `SignerToken`、不设 `SignerURL` 时，仍然使用内置签名。
+
+使用签名服务时，需要签名的请求发出前，SDK 把 URL 和请求体发给签名服务，用返回的签名头替换内置签名算出的签名头。发给签名服务的请求同样经过 `Transport`。
+
+签名服务不可用时，调用返回 `sdk.ErrSignerUnavailable`（其他语言是错误码 `SIGNER_UNAVAILABLE`），错误信息带有签名服务给出的原因。这时请求不会发出，也不会自动回退到内置签名。因为内置签名失效时，回退得到的往往是空结果，SDK 还会因此换设备重试。
+
+需要回退时，调用方自己再创建一个使用内置签名的客户端，重新调用一次。两个客户端使用不同的设备档案，免得一个换设备时覆盖另一个的档案：
+
+```go
+remote, _ := adapters.NewClient("anonymous-remote.json", sdk.Options{SignerURL: signerURL})
+local, _ := adapters.NewClient("anonymous-local.json", sdk.Options{})
+
+page, err := remote.Search(ctx, "短剧", sdk.SearchOptions{})
+if errors.Is(err, sdk.ErrSignerUnavailable) {
+	page, err = local.Search(ctx, "短剧", sdk.SearchOptions{})
+}
+```
 
 ## 接口
 
