@@ -1,7 +1,9 @@
 package contract
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -87,6 +89,10 @@ func (f *fixtureTransport) Do(_ context.Context, req *sdk.Request) (*sdk.Respons
 		return f.file("short-rank.json"), nil
 	}
 	if strings.HasPrefix(u.Path, "/novel/commentapi/user/profile/") {
+		// The page asks for its tabs (no tab_type) before the works.
+		if !bytes.Contains(req.Body, []byte(`"tab_type"`)) {
+			return f.file("person-tabs.json"), nil
+		}
 		return f.file("person-works.json"), nil
 	}
 	if strings.HasPrefix(u.Path, "/novel/commentapi/comment/list/") {
@@ -101,6 +107,7 @@ func (f *fixtureTransport) Do(_ context.Context, req *sdk.Request) (*sdk.Respons
 		protocol.PathSearch:          "search-response.json",
 		protocol.PathSeries:          "series-response.json",
 		protocol.PathPlayback:        "clear-playback.json",
+		protocol.PathPlaybackV5:      "clear-playback.json",
 		protocol.PathSuggest:         "suggest-response.json",
 		protocol.PathCue:             "cue-response.json",
 		protocol.PathCategory:        "category-front.json",
@@ -169,4 +176,70 @@ func TestRunReportsDriftInSeriesDetail(t *testing.T) {
 		return
 	}
 	t.Fatal("no series detail check")
+}
+
+func TestEpisodeEnvelopeUnwrapsV5Playback(t *testing.T) {
+	const id = "7100000000000201"
+	entry := `{"expire_time":1,"video_model":"{\"status\":10,\"video_id\":\"v\"}"}`
+	legacy := `{"code":0,"data":` + entry + `}`
+	for name, body := range map[string]string{
+		"flat":    `{"code":0,"data":{"` + id + `":` + entry + `}}`,
+		"grouped": `{"code":0,"data":{"1004":{"` + id + `":` + entry + `}}}`,
+		"legacy":  legacy,
+	} {
+		got, err := Shape(episodeEnvelope([]byte(body), id))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		want, _ := Shape([]byte(legacy))
+		if fmt.Sprint(got) != fmt.Sprint(want) {
+			t.Fatalf("%s: shape = %v, want %v", name, got, want)
+		}
+		if strings.Contains(fmt.Sprint(got), id) {
+			t.Fatalf("%s: episode ID leaked into the shape", name)
+		}
+	}
+	other := `{"code":0,"data":{"7100000000000999":` + entry + `}}`
+	if string(episodeEnvelope([]byte(other), id)) != other {
+		t.Fatal("a response without the requested episode was rewritten")
+	}
+}
+
+// emptyPlaybackTransport makes every playback route return an empty body,
+// which the SDK reports as ErrAnonymousLimited. It counts playback requests
+// so the retry budget can be asserted.
+type emptyPlaybackTransport struct {
+	inner     *fixtureTransport
+	playbacks int
+}
+
+func (e *emptyPlaybackTransport) Do(ctx context.Context, req *sdk.Request) (*sdk.Response, error) {
+	u, err := url.Parse(req.URL)
+	if err != nil {
+		return nil, err
+	}
+	if u.Path == protocol.PathPlaybackV5 || u.Path == protocol.PathPlayback {
+		e.playbacks++
+		// A 2xx with an empty body is the empty result that drives the retry.
+		return &sdk.Response{StatusCode: 200, Body: nil}, nil
+	}
+	return e.inner.Do(ctx, req)
+}
+
+// TestRunPlaybackRetryBudgetIsBounded locks the playback retry to a finite
+// budget so a persistently anonymous-limited service cannot spin forever.
+// contract sets DeviceResets=0, so SDK auto device resets are off and the
+// only resets are the manual loop (max 2): 3 ResolvePlayback calls, each
+// issuing 2 V5 attempts + 1 legacy fallback, for at most 9 requests.
+func TestRunPlaybackRetryBudgetIsBounded(t *testing.T) {
+	tr := &emptyPlaybackTransport{inner: &fixtureTransport{t: t}}
+	Run(context.Background(), Config{
+		Transport: tr, Profiles: memstore.New(), FixtureDir: fixtureDir, Query: "Fixture",
+	})
+	if tr.playbacks > 9 {
+		t.Fatalf("playback requests = %d, want <= 9", tr.playbacks)
+	}
+	if tr.playbacks == 0 {
+		t.Fatal("no playback request was made")
+	}
 }

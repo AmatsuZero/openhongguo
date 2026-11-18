@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -68,6 +69,8 @@ func Run(ctx context.Context, cfg Config) []Check {
 	client, err := sdk.NewClient(sdk.Options{
 		Transport: rec, ProfileStore: cfg.Profiles, Signer: sdk.UnavailableSigner{},
 		APIOrigin: cfg.APIOrigin, DistributionOrigin: cfg.DistributionOrigin,
+		// 换设备由 playSeries 的手动循环负责（v0.3.0 补丁），关闭 SDK 自动换设备避免重复重试。
+		DeviceResets: sdk.Int(0),
 	})
 	if err != nil {
 		return []Check{{Name: "client", Err: err}}
@@ -326,6 +329,7 @@ func playSeries(ctx context.Context, client *sdk.Client, rec *recorder, cfg Conf
 		return checks
 	}
 
+	rec.forget(protocol.PathPlaybackV5)
 	rec.forget(protocol.PathPlayback)
 	pb, err := client.ResolvePlayback(ctx, page.Items[0].ID, sdk.PlaybackOptions{})
 	// Since 2026-10-29 the service answers each anonymous device with a model
@@ -349,7 +353,14 @@ func playSeries(ctx context.Context, client *sdk.Client, rec *recorder, cfg Conf
 			playbackFixture = "drm-playback.json"
 		}
 	}
-	checks = append(checks, rec.check(cfg, name+" playback", playbackFixture, protocol.PathPlayback, err))
+	// ResolvePlayback tries V5 first and only then the legacy route, so a
+	// recorded legacy body means V5 came back empty and the fallback answered.
+	playbackPath := protocol.PathPlayback
+	if !rec.has(playbackPath) {
+		playbackPath = protocol.PathPlaybackV5
+		rec.rewrite(playbackPath, func(b []byte) []byte { return episodeEnvelope(b, page.Items[0].ID) })
+	}
+	checks = append(checks, rec.check(cfg, name+" playback", playbackFixture, playbackPath, err))
 	if err != nil || !pb.Protected {
 		return checks
 	}
@@ -495,6 +506,47 @@ func (r *recorder) body(path string) ([]byte, bool) {
 func (r *recorder) has(path string) bool {
 	_, ok := r.body(path)
 	return ok
+}
+
+// rewrite replaces the recorded body for path with fn's result.
+func (r *recorder) rewrite(path string, fn func([]byte) []byte) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if b, ok := r.bodies[path]; ok {
+		r.bodies[path] = fn(b)
+	}
+}
+
+// episodeEnvelope turns a V5 batch playback response into the single-episode
+// envelope the fixtures describe. V5 keys each model by episode ID, either
+// as data[id] or grouped as data["1004"][id]. Comparing that as-is would put
+// the ID into every field path and into the report, so the entry for
+// episodeID replaces data. Other bodies come back unchanged.
+func episodeEnvelope(body []byte, episodeID string) []byte {
+	var doc map[string]json.RawMessage
+	if json.Unmarshal(body, &doc) != nil {
+		return body
+	}
+	var data map[string]json.RawMessage
+	if json.Unmarshal(doc["data"], &data) != nil {
+		return body
+	}
+	entry, ok := data[episodeID]
+	if !ok {
+		var group map[string]json.RawMessage
+		if json.Unmarshal(data["1004"], &group) != nil {
+			return body
+		}
+		if entry, ok = group[episodeID]; !ok {
+			return body
+		}
+	}
+	doc["data"] = entry
+	out, err := json.Marshal(doc)
+	if err != nil {
+		return body
+	}
+	return out
 }
 
 func (r *recorder) forget(path string) {
