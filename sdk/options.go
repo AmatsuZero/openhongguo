@@ -20,6 +20,16 @@ type Options struct {
 	ProfileStore ProfileStore
 	// Signer 为需要签名的请求签名；为 nil 时使用 UnavailableSigner。
 	Signer Signer
+	// SignerURL 是 openhongguo-signer 签名服务的地址，例如
+	// "https://signer.example.com"。为空时用内置的 Go 实现签名；设置后，
+	// 带签名头的请求发出前先交给签名服务，用它返回的签名头替换内置实现
+	// 算出的签名头。签名服务的请求同样经过 Transport。签名服务不可用时，
+	// 调用返回 ErrSignerUnavailable，错误信息带有签名服务给出的原因，
+	// 不会回退到内置实现。
+	// 内置实现失效时（例如 App 升级后签名算法变化）可以切过去。
+	SignerURL string
+	// SignerToken 是签名服务的 token，服务端设置了 SIGNER_TOKEN 时才需要。
+	SignerToken string
 	// AuthProvider 附加账号状态；为 nil 时使用 AnonymousProvider。
 	AuthProvider AuthProvider
 	// Logger 接收诊断信息；为 nil 时不记录日志。
@@ -38,7 +48,8 @@ type Options struct {
 	// WebOrigin 承载官方 Web 漫画正文页；为空时使用 hongguoduanju.com。
 	// 该接口是公开页面，不使用匿名设备注册或账号凭据。
 	WebOrigin string
-	// Device 是新匿名档案注册时使用的手机，之后每次请求都出示它。
+	// Device 是新匿名档案注册时使用的手机，普通接口继续出示它。
+	// V5 播放接口也出示这台手机，只是版本号用 7.4.3.32（和 App 一致）。
 	// 零值字段取 model.DefaultDevice（Android 14 上的 Xiaomi 14，
 	// 小米应用商店渠道）。档案会保留注册时的设备，
 	// 所以修改此项只影响之后注册的档案，包括设备重置之后。
@@ -47,8 +58,8 @@ type Options struct {
 	// 0 或 1 表示不重试。
 	RetryAttempts int
 	// DeviceResets 限定一次调用最多换几台新的匿名设备。服务端拒绝当前设备
-	// （ErrDeviceRejected），或播放接口返回空结果（ErrAnonymousLimited；
-	// 2026-10-29 起，服务端对每台匿名设备大约只给一次播放模型）时，
+	// （ErrDeviceRejected），或 V5 重签重试和旧播放接口都未取得结果
+	// （ErrAnonymousLimited）时，
 	// 客户端丢弃当前设备、注册一台新设备，再重新执行这次调用。
 	// nil 表示默认的 2 次；sdk.Int(0) 表示关闭，交给调用方自己调用 ResetDevice。
 	// 换设备会覆盖 ProfileStore 里保存的档案，并通过 Logger 记一行日志。

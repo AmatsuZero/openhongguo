@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/beilunyang/openhongguo/internal/protocol"
+	"github.com/beilunyang/openhongguo/internal/protocol/sign"
 
 	"github.com/beilunyang/openhongguo/sdk/model"
 )
@@ -34,6 +35,7 @@ type Client struct {
 	transport      Transport
 	profileStore   ProfileStore
 	signer         Signer
+	playbackSigner *sign.PlaybackV5Signer
 	authProvider   AuthProvider
 	logger         Logger
 	clock          func() time.Time
@@ -97,13 +99,23 @@ func NewClient(opts Options) (*Client, error) {
 	if err := opts.Device.Validate(); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidOptions, err)
 	}
+	transport := opts.Transport
+	if opts.SignerURL != "" {
+		u, err := url.Parse(opts.SignerURL)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return nil, fmt.Errorf("%w: SignerURL must be an http(s) address", ErrInvalidOptions)
+		}
+		transport = newRemoteSigner(transport, opts.SignerURL, opts.SignerToken)
+	}
 	return &Client{
 		device:        opts.Device.OrDefault(),
 		retryAttempts: attempts,
 		deviceResets:  resets,
-		transport:     opts.Transport, profileStore: opts.ProfileStore,
-		signer: opts.Signer, authProvider: opts.AuthProvider,
-		logger: opts.Logger, clock: opts.Clock,
+		transport:     transport, profileStore: opts.ProfileStore,
+		signer:         opts.Signer,
+		playbackSigner: sign.NewPlaybackV5Signer(opts.Clock().UnixMilli()),
+		authProvider:   opts.AuthProvider,
+		logger:         opts.Logger, clock: opts.Clock,
 		apiOrigin: api, registerOrigin: reg, distOrigin: dist, webOrigin: web,
 	}, nil
 }
@@ -192,6 +204,11 @@ func (c *Client) doOnce(ctx context.Context, method, rawURL string, headers map[
 	}
 	resp, err := c.transport.Do(ctx, req)
 	if err != nil {
+		// 签名服务（Options.SignerURL）的错误原样返回，方便看出签名服务的问题；
+		// 其余错误可能带着完整 URL，只返回脱敏后的地址。
+		if errors.Is(err, ErrSignerUnavailable) {
+			return nil, nil, err
+		}
 		return nil, nil, fmt.Errorf("%w: %s", ErrTransport, protocol.RedactedURL(req.URL))
 	}
 	if c.logger != nil {

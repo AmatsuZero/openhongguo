@@ -1,6 +1,7 @@
 package sdk_test
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -70,11 +71,12 @@ func testClient(t *testing.T, handler http.Handler) (*sdk.Client, *logCapture) {
 func happyHandler(t *testing.T, seen *[]captured) http.Handler {
 	t.Helper()
 	files := map[string]string{
-		protocol.PathDiscover: "discover-response.json",
-		protocol.PathSearch:   "search-response.json",
-		protocol.PathSeries:   "series-response.json",
-		protocol.PathPlayback: "drm-playback.json",
-		protocol.PathRegister: "register-response.json",
+		protocol.PathDiscover:   "discover-response.json",
+		protocol.PathSearch:     "search-response.json",
+		protocol.PathSeries:     "series-response.json",
+		protocol.PathPlayback:   "drm-playback.json",
+		protocol.PathPlaybackV5: "drm-playback.json",
+		protocol.PathRegister:   "register-response.json",
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
@@ -472,17 +474,41 @@ func assertAnonymousWire(t *testing.T, seen []captured) {
 			if hit.Header.Get("x-gorgon") == "" || hit.Header.Get("x-ss-stub") == "" {
 				t.Fatal("series signature missing")
 			}
-		case protocol.PathPlayback:
+		case protocol.PathPlaybackV5:
 			played = true
-			if !strings.HasPrefix(hit.RawQuery, "iid=") || strings.Contains(hit.RawQuery, " ") {
-				t.Fatal("playback query was re-encoded")
+			q, _ := url.ParseQuery(hit.RawQuery)
+			if q.Get("version_code") != "74332" || q.Get("device_id") != "7100000000000001" || q.Get("iid") != "7100000000000002" {
+				t.Fatalf("playback query = %s", hit.RawQuery)
 			}
-			if !strings.Contains(hit.Body, `"video_id":"7100000000000201"`) || !strings.Contains(hit.Body, `"need_all_video_definition":true`) {
-				t.Fatalf("playback body = %s", hit.Body)
+			// The 7.4.3.32 client's order: device_platform first, the ticket fourth,
+			// and the profile's own phone rather than a fixed template.
+			if !strings.HasPrefix(hit.RawQuery, "device_platform=android&os=android&ssmix=a&_rticket=") || q.Get("device_type") != model.DefaultDevice.Model || q.Get("resolution") != model.DefaultDevice.Resolution {
+				t.Fatalf("playback query order or device = %s", hit.RawQuery)
 			}
-			if hit.Header.Get("x-gorgon") == "" || hit.Header.Get("x-ss-stub") == "" {
-				t.Fatal("playback signature missing")
+			if hit.Header.Get("lc") != "101" || hit.Header.Get("x-xs-from-web") != "0" || !strings.Contains(hit.Header.Get("User-Agent"), "com.phoenix.read/74332 ") {
+				t.Fatalf("playback headers = %v", hit.Header)
 			}
+			zr, err := gzip.NewReader(strings.NewReader(hit.Body))
+			if err != nil {
+				t.Fatalf("playback body is not gzip: %v", err)
+			}
+			plain, err := io.ReadAll(zr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(plain), `"mixed_video_id_map":{"1004":["7100000000000201"]}`) || !strings.Contains(string(plain), `"need_all_video_definition":true`) || !strings.Contains(string(plain), `"device_level":1`) {
+				t.Fatalf("playback body = %s", plain)
+			}
+			if hit.Header.Get("Content-Encoding") != "gzip" || hit.Header.Get("x-medusa") == "" || hit.Header.Get("x-helios") == "" || hit.Header.Get("x-khronos") == "" || hit.Header.Get("x-ss-stub") == "" {
+				t.Fatal("playback V5 signature missing")
+			}
+			for _, h := range []string{"x-argus", "x-ladon", "x-gorgon"} {
+				if hit.Header.Get(h) != "" {
+					t.Fatalf("playback V5 carries legacy %s", h)
+				}
+			}
+		case protocol.PathPlayback:
+			t.Fatal("playback fell back to the legacy route")
 		default:
 			t.Fatalf("unexpected path %s", hit.Path)
 		}
@@ -1126,7 +1152,7 @@ func TestShortRankReadsActorsAndPagesWithoutFilterIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if page.Content != protocol.ShortRankActors || page.Board != "ranklist_series_actor" || len(page.Items) != 3 || page.Cursor == "" {
+	if page.Content != protocol.ShortRankActors || page.Board != "" || len(page.Items) != 3 || page.Cursor == "" {
 		t.Fatalf("page = %+v", page)
 	}
 	if a := page.Items[0]; a.ActorID != "7100000000001401" || a.Actor != "Fixture Actor A" || a.SeriesID != "" {
@@ -1195,10 +1221,11 @@ func TestNewReleasesSendsDateAndResumesFromCursor(t *testing.T) {
 	}
 }
 
-func TestPersonAndWorks(t *testing.T) {
-	var bodies []map[string]any
-	var paths []string
-	client, _ := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// worksServer answers a person's page: the tab list when the body names no
+// tab_type, the works otherwise. It records every body.
+func worksServer(t *testing.T, tabs string, bodies *[]map[string]any) http.Handler {
+	t.Helper()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.URL.Path == protocol.PathRegister:
@@ -1208,18 +1235,26 @@ func TestPersonAndWorks(t *testing.T) {
 				t.Errorf("profile query = %v", r.URL.Query())
 			}
 			_, _ = w.Write(fixture(t, "person.json"))
-		case strings.HasPrefix(r.URL.Path, "/novel/commentapi/user/profile/"):
-			paths = append(paths, r.URL.Path)
+		case r.URL.Path == "/novel/commentapi/user/profile/7100000000001701/v1":
 			body := map[string]any{}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Error(err)
 			}
-			bodies = append(bodies, body)
+			*bodies = append(*bodies, body)
+			if _, ok := body["tab_type"]; !ok {
+				_, _ = w.Write([]byte(tabs))
+				return
+			}
 			_, _ = w.Write(fixture(t, "person-works.json"))
 		default:
 			http.NotFound(w, r)
 		}
-	}))
+	})
+}
+
+func TestPersonAndWorks(t *testing.T) {
+	var bodies []map[string]any
+	client, _ := testClient(t, worksServer(t, string(fixture(t, "person-tabs.json")), &bodies))
 	ctx := context.Background()
 	person, err := client.Person(ctx, "7100000000001701")
 	if err != nil || person.Name != "Fixture Actor" {
@@ -1229,11 +1264,14 @@ func TestPersonAndWorks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if paths[0] != "/novel/commentapi/user/profile/7100000000001701/v1" {
-		t.Fatalf("path = %s", paths[0])
+	if len(bodies) != 2 {
+		t.Fatalf("first page sent %d requests", len(bodies))
 	}
-	if b := bodies[0]; b["tab_type"] != float64(23) || b["sub_tab_type"] != float64(22) || b["cursor"] != "" || b["target_user_id"] != "7100000000001701" {
-		t.Fatalf("body = %v", b)
+	if b := bodies[0]; b["locate_album_id"] != "" || b["target_user_id"] != "7100000000001701" {
+		t.Fatalf("tab list body = %v", b)
+	}
+	if b := bodies[1]; b["tab_type"] != float64(8) || b["sub_tab_type"] != float64(100) || b["cursor"] != "" || b["target_user_id"] != "7100000000001701" {
+		t.Fatalf("works body = %v", b)
 	}
 	if len(works.Items) != 2 || works.Cursor == "" {
 		t.Fatalf("works = %+v", works)
@@ -1241,14 +1279,40 @@ func TestPersonAndWorks(t *testing.T) {
 	if _, err := client.PersonWorks(ctx, "7100000000001701", works.Cursor); err != nil {
 		t.Fatal(err)
 	}
-	if c, _ := bodies[1]["cursor"].(string); !strings.Contains(c, `"next_cursor"`) {
-		t.Fatalf("next cursor = %v", bodies[1]["cursor"])
+	// The next page reuses the tab from the cursor instead of asking again.
+	if len(bodies) != 3 || bodies[2]["tab_type"] != float64(8) || bodies[2]["sub_tab_type"] != float64(100) {
+		t.Fatalf("next page bodies = %v", bodies[2:])
+	}
+	if c, _ := bodies[2]["cursor"].(string); !strings.Contains(c, `"next_cursor"`) {
+		t.Fatalf("next cursor = %v", bodies[2]["cursor"])
 	}
 	if _, err := client.PersonWorks(ctx, "7100000000001702", works.Cursor); err == nil {
 		t.Fatal("another person's cursor accepted")
 	}
 	if _, err := client.Person(ctx, "../x"); err == nil {
 		t.Fatal("malformed user ID accepted")
+	}
+}
+
+func TestPersonWorksFollowsThePageLayout(t *testing.T) {
+	var bodies []map[string]any
+	client, _ := testClient(t, worksServer(t, string(fixture(t, "person-tabs-works.json")), &bodies))
+	works, err := client.PersonWorks(context.Background(), "7100000000001701", "")
+	if err != nil || len(works.Items) != 2 {
+		t.Fatalf("works = %+v err %v", works, err)
+	}
+	if b := bodies[len(bodies)-1]; b["tab_type"] != float64(23) || b["sub_tab_type"] != float64(22) {
+		t.Fatalf("works body = %v", b)
+	}
+
+	bodies = nil
+	client, _ = testClient(t, worksServer(t, `{"code":0,"data":{"tabs":[{"name":"红果圈","tab_type":7,"sub_tabs":[]}]}}`, &bodies))
+	works, err = client.PersonWorks(context.Background(), "7100000000001701", "")
+	if err != nil || works == nil || len(works.Items) != 0 || works.Cursor != "" {
+		t.Fatalf("works without 剧作 = %+v err %v", works, err)
+	}
+	if len(bodies) != 1 {
+		t.Fatalf("a page without 剧作 still asked for works: %v", bodies)
 	}
 }
 

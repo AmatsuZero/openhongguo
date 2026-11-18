@@ -257,7 +257,9 @@ func SignedCuePairs(id SearchIdentity, cueType, limit int) [][2]string {
 // SignedSuggestPairs is the ordered search-suggest query.
 func SignedSuggestPairs(id SearchIdentity, keyword string) [][2]string {
 	return append(DeviceQueryPairs(id),
-		[2]string{"query", keyword},
+		// The 7.4.3.32 client names the prefix q (captured 2026-11-18); the
+		// service still reads query as well and answers both the same.
+		[2]string{"q", keyword},
 		[2]string{"count", "10"},
 		[2]string{"search_source", SearchSourceHome},
 		[2]string{"user_is_login", "0"},
@@ -440,10 +442,31 @@ func SignedProfilePairs(id SearchIdentity, userID string) [][2]string {
 	)
 }
 
-// UserWorksBody is the 作品 › 剧作 tab of a person's page (tab_type 23,
-// sub_tab_type 22). cursor is the service's own cursor string; empty is the
-// first page.
-func UserWorksBody(userID, cursor string) ([]byte, error) {
+// WorksTab is the tab and sub tab of a person's page that list their works.
+type WorksTab struct {
+	Tab int `json:"t"`
+	Sub int `json:"s"`
+}
+
+// UserWorksTabsBody asks for a person's page tabs. The page sends it first,
+// without a tab_type, and reads which tab holds the works from the answer:
+// the layout differs between devices (2026-11: some get 作品 23 › 剧作 22,
+// fresh anonymous devices get 剧作 8 › 全部 100, and each answers an empty
+// list for the other's numbers).
+func UserWorksTabsBody(userID string) ([]byte, error) {
+	return jsonMarshal(map[string]any{
+		"aid":             8662,
+		"comment_source":  1506,
+		"extra_param":     map[string]string{"enter_source": "12"},
+		"locate_album_id": "",
+		"sort":            "time_desc",
+		"target_user_id":  userID,
+	})
+}
+
+// UserWorksBody is one page of a person's works under tab. cursor is the
+// service's own cursor string; empty is the first page.
+func UserWorksBody(userID, cursor string, tab WorksTab) ([]byte, error) {
 	return jsonMarshal(map[string]any{
 		"comment_source":    1506,
 		"count":             18,
@@ -452,8 +475,8 @@ func UserWorksBody(userID, cursor string) ([]byte, error) {
 		"locate_post_id":    "",
 		"profile_user_type": 0,
 		"sort":              "time_desc",
-		"sub_tab_type":      22,
-		"tab_type":          23,
+		"sub_tab_type":      tab.Sub,
+		"tab_type":          tab.Tab,
 		"target_user_id":    userID,
 	})
 }
