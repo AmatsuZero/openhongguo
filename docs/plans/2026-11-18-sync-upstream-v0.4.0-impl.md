@@ -2,109 +2,96 @@
 
 日期：2026-11-18
 对应设计：`docs/plans/2026-11-18-sync-upstream-v0.4.0-design.md`
-状态：已纳入 codex review（第一轮 REQUEST CHANGES，本版逐条修订）。
+状态：已纳入 codex review（第一轮 REQUEST CHANGES 9 条已闭合，第二轮 2 P1/2 P2/1 P3 本版逐条修订）。
 
-约定：上游指 `v0.4.0` tag（已 fetch 到本地，含中间 `v0.3.1`）。所有上游改动通过 `git show v0.4.0:<path>` / `git diff v0.3.0 v0.3.1 -- <path>` 读取，逐文件手工合并，**禁止 `git checkout` 目录/整文件覆盖 fork 版本**。
+## 全局约定
 
-提交与授权（用户已确认，解决 codex P1-3）：**每个 Task 在本地 commit 一次**（便于 TDD 节奏与回滚），但**绝不 `git push`、绝不打标签**。全部 Task 完成 + 本地门禁全绿后汇报，等用户**单独授权**才推送与发版。当前状态：HEAD=`bee17c9`（比 origin/main 超前 1 个文档 commit）、工作树有未跟踪的 `.codebuddy/`——该目录是本地工具配置，**与同步无关，不要清理、不要提交**。同步代码直接叠加在此 HEAD 之上。
-
-Task 依赖顺序原则（解决 codex P1-2）：先底层请求函数 → 再依赖它们的 client/person → 再装饰 Transport → 最后 UI 配置。每个 Task 结束时其涉及的包必须能编译、测试通过；互相依赖的文件归入同一 Task。
+- **上游**指 `v0.4.0` tag（已 fetch，含中间 `v0.3.1`）。上游改动用 `git show v0.4.0:<path>` / `git diff v0.3.0 v0.3.1 -- <path>` 读取，逐文件手工合并，**禁止 `git checkout` 目录/整文件覆盖 fork 版本**。
+- **提交与授权**（用户已确认，codex P1-3）：每个 Task 在本地 commit 一次（TDD、便于回滚），**绝不 push、绝不打标签**。全部 Task 完成 + 本地门禁全绿后汇报，等用户**单独授权**才推送与发版。
+- **执行前核对当前 HEAD 与工作树状态**（不写死 commit 号，避免状态说明过期，codex 第二轮 P3）；未跟踪 `.codebuddy/` 是本地工具配置，与同步无关，不清理、不提交。
+- **可编译单元原则**（codex 第二轮 P1-1）：因 Go 包内符号互相依赖，按"每次提交后可 `go test` 通过"聚合文件，而不是按 v0.3.1/v0.4.0 版本或功能点拆分。依赖关系已用 `git grep` 核实：
+  - `internal/protocol`：`parse.go` 的 `ParseWorksTab` 使用 `WorksTab`，类型定义在 `request.go:433` → 两文件必须同批。
+  - `sdk`：`client.go` 的 `playbackSigner` 被 `media.go` 使用；`person.go` 用 `ParseWorksTab` 与三参 `UserWorksBody`（唯一调用点）→ 这几个文件必须同批；`remote_signer.go` 的 `newRemoteSigner` 被 `client.go` 调用 → 同批。
 
 ## Task 0 — 前置核对
 
-- 确认 `v0.4.0`、`v0.3.1` tag 存在；确认 HEAD 含文档 commit、`.codebuddy/` 未跟踪属预期（见上）。
-- 不建 worktree（同步任务，直接叠加在 main 当前 HEAD），不在本 Task 提交。
-- 产出：状态确认，无代码改动。
+- 确认 `v0.4.0`、`v0.3.1` tag 存在；核对当前 HEAD、工作树状态（`.codebuddy/` 未跟踪属预期）。
+- 不建 worktree（同步任务，直接叠加在当前 HEAD），本 Task 不提交。
 
-## Task 1 — V5 播放协议 core + 解析层（v0.3.1 新增/一致文件）
+## Task 1 — internal/protocol 包整体（可编译单元，含 v0.3.1 全部 core 改动）
 
-一次完成 V5 所需的所有底层，保证后续 Task 可编译：
+一次合入整个包，保证 `go test ./internal/protocol/...` 通过：
 
-- 新增 `internal/protocol/playback_v5.go`、`playback_url.go`、`internal/protocol/sign/playback_v5.go`、`playback_v5_aes.go`、`playback_v5_constants.go`、`playback_v5_test.go`（取上游原文，无 fork 独有改动）。
-- `internal/protocol/parse.go`：fork 与 v0.3.0 一致，取上游 v0.3.1。
-- `internal/protocol/sign/aes.go`：取上游（小改）。
-- 新增 `testdata/protocol/person-tabs.json`、`person-tabs-works.json`；更新 `short-rank-actors.json`（取上游）。
+- 取上游 v0.3.1 版本（fork 与 v0.3.0 一致）：`internal/protocol/parse.go`、`cursor.go`、`sign/aes.go`。
+- 新增（取上游原文）：`playback_v5.go`、`playback_url.go`、`sign/playback_v5.go`、`sign/playback_v5_aes.go`、`sign/playback_v5_constants.go`、`sign/playback_v5_test.go`。
+- **冲突文件手工合并**：`internal/protocol/request.go`（合入 `WorksTab`、`UserWorksTabsBody`、三参 `UserWorksBody`、`SignedCellChangePairs` 改动，**保留** fork 的 `FeedContinuation.Limit`/`CellChangeLimit()`/`limit` 逻辑）；`internal/protocol/cursor.go`（**保留** fork 的 `feedCursor.Limit` 编解码，codex P2-1）；`internal/protocol/parse_test.go`（fork 有 `Limit=30` 往返断言，不得整文件替换，codex 第一轮 P2-1）。
+- 新增/更新 testdata：`person-tabs.json`、`person-tabs-works.json`、`short-rank-actors.json`（取上游）。
 - 验证：`go test ./internal/protocol/...`。
 
-## Task 2 — 请求层与游标（冲突文件，person 的前置依赖）
+## Task 2 — sdk 包整体（可编译单元，含 V5 接线 + 远程签名 core）
 
-必须先于 person/client：person.go 依赖本 Task 的 `UserWorksTabsBody`、新版 `UserWorksBody(userID, cur, *tab)`。
+一次合入整个 sdk，保证 `go test ./sdk/...` 通过：
 
-- `internal/protocol/request.go`：合入上游 v0.3.1 对请求参数的改动 + 新增 `UserWorksTabsBody`、改 `UserWorksBody` 签名；**保留** fork 的 `FeedContinuation.Limit` 字段、`CellChangeLimit()`、`limit` 取值逻辑。
-- `internal/protocol/cursor.go`：合入上游改动，保留 fork 的 `feedCursor.Limit` 编解码。
-- `internal/protocol/parse_test.go`：**冲突文件**（codex P2-1）——fork 增加了游标 `Limit=30` 往返断言，不得整文件替换；合入上游 v0.3.1 用例并保留 fork 断言。
-- 验证：`go test ./internal/protocol/...`；确认 fork 的 PageSize/Limit 回归测试仍通过。
+- `sdk/client.go`（冲突）：保留 fork 独有 `webOrigin`、`durations`（弹幕）、`resetter` 并发换设备语义、`WebOrigin` 默认值；合入 **v0.3.1 已引入**的 `playbackSigner *sign.PlaybackV5Signer` 及 `sign.NewPlaybackV5Signer(opts.Clock().UnixMilli())` 初始化（**不是 v0.4.0**）；合入 v0.4.0 的 `SignerURL` 校验 + `newRemoteSigner` 包装、`doOnce` 中 `ErrSignerUnavailable` 原样返回。
+- `sdk/media.go`、`sdk/person.go`、`sdk/model/catalog.go`（fork 与 v0.3.0 一致）：取上游 v0.3.1（`ResolvePlayback` V5 优先 + 空结果重签一次 300ms + 404/405 回退 + `playbackRouteUnavailable`；person 用 Task 1 的 `ParseWorksTab`/三参 `UserWorksBody`）。
+- `sdk/options.go`（冲突）：合入 v0.3.1 注释更新 + v0.4.0 的 `SignerURL`/`SignerToken`；**保留** fork 的 `WebOrigin`。
+- `sdk/catalog_test.go`（冲突，codex 第一轮 P1-1）：合入上游 V5/person 断言与夹具，**保留** fork 的 `TestDiscoverPageSizeUsesLimit` 等。
+- 新增 `sdk/remote_signer.go`、`sdk/remote_signer_test.go`（取上游原文）；`sdk/errors.go` 合入 `ErrSignerUnavailable` 语义扩展（错误值 fork 已有）。
+- 验证：`go test ./sdk/...`。
+- **远程签名覆盖范围**（codex 第一轮 P2-3）：装饰器仅拦带 `x-medusa` 请求；V5 回退旧接口时旧接口删除 `x-medusa`，回退请求仍用内置 Argus/Ladon 签名。「不回退」仅指签名服务自身失败。
 
-## Task 3 — 解析重试与分页测试（冲突文件）
+## Task 3 — contract 层（冲突文件，三层重试定责）
 
-- `sdk/catalog_test.go`：**冲突文件**（codex P1-1，原计划遗漏）——上游把播放/person 断言改为 V5、更新 person tabs 夹具；fork 有 `TestDiscoverPageSizeUsesLimit` 等用例。手工合并两侧，保留 fork 测试。
-- 验证：`go test ./sdk/...`（此时 client 尚未合 V5，若测试依赖 V5 断言则本 Task 与 Task 4 合并提交——见下）。
-
-## Task 4 — client / person / media / catalog 的 V5 接线（冲突文件，可编译单元）
-
-把相互依赖的 SDK 文件作为一个可编译单元（解决 codex P1-2、P1-1）：
-
-- `sdk/client.go`（冲突）：保留 fork 独有 `webOrigin`、`durations`（弹幕）、`resetter` 并发换设备语义、`WebOrigin` 默认值；合入 **v0.3.1 已引入**的 `playbackSigner *sign.PlaybackV5Signer` 字段及 `sign.NewPlaybackV5Signer(opts.Clock().UnixMilli())` 初始化（**不是 v0.4.0**）；保留 v0.4.0 的 `SignerURL` 字段校验 + `newRemoteSigner` 包装（包装函数在 Task 5 新增，本 Task 与之同批提交以保证可编译）、`doOnce` 中 `ErrSignerUnavailable` 原样返回。
-- `sdk/media.go`（fork 与 v0.3.0 一致）：取上游 v0.3.1 的 `ResolvePlayback`（V5 优先 + 空结果重签重试一次 300ms + 404/405 回退旧接口 + `playbackRouteUnavailable`）。
-- `sdk/person.go`（fork 与 v0.3.0 一致）：取上游 v0.3.1（依赖 Task 2 的新函数）。
-- `sdk/model/catalog.go`（一致）：取上游 v0.3.1。
-- `sdk/options.go`（冲突）：合入 v0.3.1 注释更新 + v0.4.0 的 `SignerURL`/`SignerToken` 字段；保留 fork 的 `WebOrigin`。
-- 验证：`go test ./sdk/...`（含 Task 3 合并后的 catalog_test.go）。
-
-## Task 5 — 远程签名 core（v0.4.0 新增文件）
-
-- 新增 `sdk/remote_signer.go`、`sdk/remote_signer_test.go`（取上游原文）。
-- `sdk/errors.go`：合入 `ErrSignerUnavailable` 语义扩展（注释；错误值 fork 已有）。
-- 与 Task 4 的 client 包装同批提交以保证可编译（见 Task 4）。
-- 验证：`go test ./sdk/...`，含 `remote_signer_test.go`。
-- **覆盖范围限制**（codex P2-3）：远程签名装饰器仅拦截带 `x-medusa` 的请求；V5 回退旧播放接口时，旧接口会删除 `x-medusa`，故回退请求仍用内置 Argus/Ladon 签名，不受 `SignerURL` 覆盖。「不回退内置签名」仅指签名服务自身失败时，不概括播放路由回退。
-
-## Task 6 — contract 层（冲突文件，含三层重试预算）
-
-- `internal/contract/run.go`（冲突）：合入上游改动，**保留** fork 的 `playSeries` 中 `ErrAnonymousLimited` → `ResetDevice` 换设备循环（最多 2 次）。
-- **三层重试预算**（codex P2-2）：一次 contract 检查的重试来自三层——① `ResolvePlayback` 内 V5 重签 + 旧接口回退（每次尝试 2 次 V5 + 1 次旧接口）；② SDK `withFreshDevice` 默认自动换设备最多 2 次（`sdk/reset.go:10`）；③ fork contract 手动换设备最多 2 次。持续 `ErrAnonymousLimited` 时理论上最多 8 次换设备、27 次播放请求。合入后**明确唯一换设备责任方与总预算**，避免无界重试；加测试断言请求次数在预期范围。
-- `internal/contract/contract_test.go`：取上游新增用例，保留 fork 用例。
+- `internal/contract/run.go`（冲突）：合入上游对 contract 的其余改动；处理换设备重试——
+  - **唯一换设备责任方 = contract 手动循环，SDK 自动换设备关闭**（codex 第二轮 P2-1 定责）：在 contract 创建 client 的 `sdk.Options` 中加 `DeviceResets: sdk.Int(0)`，使 `withFreshDevice` 直接 `return call(ctx)`（`sdk/reset.go:35`）。保留 fork 的 `playSeries` 中 `ErrAnonymousLimited` → `ResetDevice` 手动循环（最多 2 次）。理由：上游 v0.3.1 的 contract 本就无手动循环、依赖 SDK；fork 的手动循环是 v0.3.0 补丁，二者并存会无界重试。关闭 SDK 自动换设备后责任单一，且 production 调用者（CLI、hongguo-cli）不受影响。
+  - **总预算**：最多 2 次换设备、9 次播放请求（初始 1 + 每次换设备后 1，共 3 次 `ResolvePlayback`；每次内部 2 次 V5 + 1 次旧接口）。
+- `internal/contract/contract_test.go`：合入上游用例，保留 fork 用例；**加断言**锁定持续 `ErrAnonymousLimited` 时请求次数 ≤ 9、换设备 ≤ 2。
 - 验证：`go test ./internal/contract/...`（live contract 定时任务属历史 run，区分对待）。
 
-## Task 7 — dispatch 配置透传（冲突文件，含陷阱）
+## Task 4 — dispatch 配置透传（冲突文件，含陷阱）
 
 - `bindings/internal/dispatch/dispatch.go`：新增 `SignerURL`/`SignerToken` 字段与 `Apply` 透传；**保留** fork 的 `WebOrigin` 字段与 `getComicReader` 方法；**不得**带回上游的 `DeviceResets *int` 及 `opts.DeviceResets = cfg.DeviceResets`（fork binding 层已删该透传，core 层不受影响）。
-- `bindings/internal/dispatch/dispatch_test.go`：合入上游 signer 用例，保留 fork 用例（含 `webOrigin` 相关，见 codex 核对）。
+- `bindings/internal/dispatch/dispatch_test.go`：合入上游 signer 用例，保留 fork 的 `webOrigin` 等用例。
 - 验证：`go test ./bindings/internal/...`。
 
-## Task 8 — bindings 各语言 signerUrl/signerToken 透传
+## Task 5 — bindings 各语言 signerUrl/signerToken 透传
 
-- 逐语言合入上游 v0.4.0 的 client 配置字段与类型（配置字段，非 V5 类型）：node `index.js`/`index.d.ts`/`types.d.ts`、react-native `src/client.ts`/`src/types.ts`、mobile `Client.kt`/`Client.swift`、`cmd/ohg/main.go`（CLI 读 `OHG_SIGNER_URL`/`OHG_SIGNER_TOKEN`）。
+逐语言合入上游 v0.4.0 的客户端配置字段与类型（配置字段，非 V5 类型）：
+
+- node：`index.js`、`index.d.ts`、`types.d.ts`
+- react-native：`src/client.ts`、`src/types.ts`
+- mobile：`Client.kt`、`Client.swift`
+- **flutter：`lib/src/client.dart`**（上游增加 `signerUrl`/`signerToken` 构造参数与 JSON 透传，**`make gen` 不生成此文件，必须手工合入**，codex 第二轮 P1-2）
+- `cmd/ohg/main.go`：CLI 读 `OHG_SIGNER_URL`/`OHG_SIGNER_TOKEN`。
 - **各语言 Types 文件含 fork 独有内容（漫画类型、PageSize），必须保留**（codex 核对确认）。
 - 版本类文件（`package.json`/`package-lock.json`/`pubspec.yaml`/`build.gradle*`/podspec/`Package.swift`）只取 signer 相关语义，**版本号与 AmatsuZero 分发地址保持 fork 现状**。
-- 验证：`make gen`（生成文件后**审阅 diff**，见 Task 11）；`make test-node`、`make test-react-native`。
+- 验证：`make gen` 后审阅生成 diff；`make test-node`、`make test-react-native`。
 
-## Task 9 — 文档与 changelog
+## Task 6 — 文档与 changelog
 
-- `README.md`：合入「选择签名方式」章节、Options 表 `SignerURL/SignerToken` 行、错误码说明；URL 按 fork 规则处理（仓库/CI/Release 用 AmatsuZero，Go module/Android Maven/作者版权保留 beilunyang）。
-- **死链处理**（codex P2-6）：上游「选择签名方式」正文链接到 `signer/README.md`，但本同步排除整个 `signer/`；把该链接改为上游固定 URL 或 Docker Hub 说明，并全局检查其它 `signer/` 引用，不留死链。
+- `README.md`：合入「选择签名方式」章节、Options 表 `SignerURL/SignerToken` 行、错误码说明；URL 按 fork 规则（仓库/CI/Release 用 AmatsuZero，Go module/Android Maven/作者版权保留 beilunyang）。
+- **死链处理**（codex 第一轮 P2-6）：上游正文链接 `signer/README.md`，但本同步排除 `signer/`；替换为上游固定 URL 或 Docker Hub 说明，全局检查其它 `signer/` 引用。
 - `docs/cli.md`、`docs/development.md`、`docs/types.md` 合入上游更新；flutter `CHANGELOG.md` 与各 binding README 合入 0.3.1/0.4.0 条目，版本表述对齐 fork。
 - 验证：人工核对 URL 引用规则 + 无死链。
 
-## Task 10 — 本地验证门禁（对应现有 CI，codex P2-4）
+## Task 7 — 本地验证门禁（对应现有 CI，codex 第一轮 P2-4、第二轮 P2-2）
 
-`make gen` 是**写入生成文件**而非 drift 校验；drift 由 Go 生成物测试检查。全部通过后再汇报：
+`make gen` 是**写入生成文件**而非 drift 校验；drift 由 Go 生成物测试检查，生成后须审阅 diff。全部通过后汇报：
 
-1. `make gen` 后审阅生成 diff（确认仅预期变化）
-2. `go vet ./...`
-3. `go test ./...`
+1. `make gen` 后审阅生成 diff（仅预期变化）
+2. 根目录 `go vet ./...`、`go test ./...`
+3. **嵌套 module `bindings/mobile/core`**（根目录命令不覆盖，CI 单独跑，codex 第二轮 P2-2）：在该目录执行 `go vet ./...`、`go test ./...`
 4. `make test-node`、`make test-react-native`
 5. wasm 侧 `go vet`/`go test`（对照根 `ci.yml` 的 wasm job）
 6. Swift 壳 `swift build` + `swift test`；Kotlin `compileDebugKotlin`/`test`（本地实编）
-7. Flutter `flutter analyze` + `flutter test`（若本机可用；否则注明留给 CI）
-8. `gofmt -l` 无输出
-- 明确留给 CI 的部分并在汇报中说明。仓库无 benchmark 门禁（codex 核对确认）。
+7. Flutter `flutter analyze` + `flutter test`（本机可用时；否则注明留给 CI）
+8. `gofmt -l` 无输出（ci.yml 门禁）
+- 明确留给 CI 的部分在汇报中说明。仓库无 benchmark 门禁（codex 核对确认）。
 
-## Task 11 — 发版（需用户单独授权，授权后才执行）
+## Task 8 — 发版（需用户单独授权，授权后才执行）
 
-- 推 `xcf-v*` 标签触发 `.github/workflows/xcf.yml`：**仅**构建并发布 `OpenhongguoCore.xcframework`（codex P2-5，该 workflow 不含 AAR）。不在本地打包。
-- AAR 不在本 workflow 产物内，另行按 fork 既有路径构建/验收（如需要）。
-- 推送后用 `gh run -R AmatsuZero/openhongguo` 盯本次 run，全绿再汇报；遇临时 infra 故障（runner 容量）等待重试，不削弱门禁。
+- 推 `xcf-v*` 标签触发 `.github/workflows/xcf.yml`：**仅**构建并发布 `OpenhongguoCore.xcframework`（该 workflow 只跑 `bindings/mobile/build.sh ios`，**不含 AAR**），**不本地打包**。AAR 另行按 fork 既有路径验收。
+- 推送后用 `gh run -R AmatsuZero/openhongguo` 盯本次 run，全绿再汇报；临时 infra 故障（runner 容量）等待重试，不削弱门禁。
 - semver 标签与 Package.swift 回填按 fork 既有发版流程处理。
 
 ## 不纳入本计划

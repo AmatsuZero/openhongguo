@@ -1,7 +1,7 @@
 # 同步上游 v0.3.1 + v0.4.0 设计
 
 日期：2026-11-18
-状态：设计已与用户逐节确认；已纳入 codex review（第一轮 REQUEST CHANGES，本版逐条修订）。
+状态：设计已与用户逐节确认；已纳入 codex review（第一轮 9 条已闭合，第二轮 2 P1/2 P2/1 P3 本版逐条修订）。
 
 ## 背景与目标
 
@@ -40,7 +40,9 @@ fork（AmatsuZero/openhongguo）的 main 停在 v0.1.8，core 只移植了上游
 2. 空结果（`ErrAnonymousLimited`）时重签重试一次（间隔 300ms）；
 3. HTTP 404/405（路由不可用）或仍空时，回退旧 `PathPlayback` 的 Argus/Ladon 签名路径。
 
-**重试是三层，不是两层**（codex P2-2）：除 V5 内部重签 + 旧接口回退外，SDK 的 `withFreshDevice`（`sdk/reset.go:10`，`defaultDeviceResets=2`）在 `ErrAnonymousLimited`/`ErrDeviceRejected` 时默认自动换设备最多 2 次，fork 的 `internal/contract/run.go` 在 `ResolvePlayback` 外又有一层手动 `ResetDevice` 循环（最多 2 次）。持续 `ErrAnonymousLimited` 时一次 contract 检查理论上最多 8 次换设备、27 次播放请求（每次尝试 2 次 V5 + 1 次旧接口）。合并后须明确定 唯一的换设备责任方与总预算，避免无界重试，并用测试锁定请求次数。
+**重试有三层，且换设备责任方必须唯一**（codex 第一/二轮 P2-2）：V5 内部重签 + 旧接口回退是一层；SDK 的 `withFreshDevice`（`sdk/reset.go:35`，默认 `deviceResets=2`）对 playback 的 `ErrAnonymousLimited` 自动换设备是一层；fork `internal/contract/run.go` 的手动 `ResetDevice` 循环（最多 2 次）又是一层。上游 v0.3.1 的 contract 本无手动循环（依赖 SDK），fork 的循环是 v0.3.0 补丁，二者并存会无界重试。
+
+**决策**：换设备唯一责任方 = contract 手动循环；contract 创建 client 时设 `DeviceResets: sdk.Int(0)` 关闭 SDK 自动换设备（`withFreshDevice` 在 `deviceResets<=0` 时直接调用，不换设备）。production 调用者（CLI、hongguo-cli）不受影响。**总预算**：最多 2 次换设备、9 次播放请求（3 次 `ResolvePlayback` × 每次 2 V5 + 1 旧接口）。用测试锁定请求次数与换设备次数上限，避免无界重试。
 
 ### 线 B：远程签名（v0.4.0，可选）
 
