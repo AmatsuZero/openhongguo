@@ -24,6 +24,9 @@ type Config struct {
 	WebOrigin          string       `json:"webOrigin"`
 	RetryAttempts      int          `json:"retryAttempts"`
 	Device             model.Device `json:"device"`
+	// SignerURL、SignerToken 见 sdk.Options：设置后由 openhongguo-signer 签名。
+	SignerURL   string `json:"signerUrl"`
+	SignerToken string `json:"signerToken"`
 }
 
 // ParseConfig 解码 raw；raw 为空时返回零值。
@@ -46,6 +49,8 @@ func (cfg Config) Apply(opts *sdk.Options) {
 	opts.WebOrigin = cfg.WebOrigin
 	opts.RetryAttempts = cfg.RetryAttempts
 	opts.Device = cfg.Device
+	opts.SignerURL = cfg.SignerURL
+	opts.SignerToken = cfg.SignerToken
 }
 
 // method 是一个可按名字调用的 SDK 方法：args 是参数数组的各项。
