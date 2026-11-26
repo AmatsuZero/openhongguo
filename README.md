@@ -321,6 +321,8 @@ type Transport interface {
 | 内置签名（默认） | 不设 `SignerURL` | 平时使用。纯 Go 实现，不依赖外部服务 |
 | 签名服务 | 设置 `SignerURL` | 内置签名失效时（例如 App 升级后签名算法变化）。需要先部署 [openhongguo-signer](https://github.com/beilunyang/openhongguo/tree/main/signer)，镜像是 Docker Hub 上的 [`beilunyang/openhongguo-signer`](https://hub.docker.com/r/beilunyang/openhongguo-signer) |
 
+> 使用签名服务时，请把镜像升级到 `beilunyang/openhongguo-signer:v0.4.1` 及以上。旧版签名带模拟器状态值，服务端从 2026-11-23 起拒绝，播放会得到空结果。
+
 ```go
 // 内置签名
 client, err := adapters.NewClient("anonymous.json", sdk.Options{})
